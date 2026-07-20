@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0f172a">
+  <title>Portal-Ekskul SMKDip 26-27</title>
+  <link rel="stylesheet" href="style.css">
+  <base target="_blank">
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-logo">📋</div>
+  <div class="login-title">Portal-Ekskul SMKDip 26-27</div>
+  <div class="login-subtitle">Masukkan password untuk melanjutkan</div>
+  <input type="password" id="passwordInput" class="login-input" placeholder="Password" autocomplete="off" inputmode="verbatim">
+  <button class="login-btn" onclick="doLogin()">Masuk</button>
+  <div class="login-error" id="loginError">❌ Password salah</div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboardScreen">
+  <div class="dashboard-header">
+    <div class="welcome-title">Selamat datang</div>
+    <div class="teacher-name" id="dashTeacherName">-</div>
+    <div class="school-name">di portal Ekstrakurikuler<br>SMK Diponegoro Tumpang</div>
+  </div>
+  <div class="dashboard-grid">
+  <div class="dash-btn" onclick="showAbsenMenu()">
+    <div class="dash-icon">📋</div>
+    <div class="dash-label">Absen Siswa</div>
+  </div>
+  <div class="dash-btn" id="regDashBtn" onclick="showRegistration()">
+    <div class="dash-icon">📝</div>
+    <div class="dash-label">Pendaftaran Ekskul</div>
+    <span class="dash-badge" id="regBadge" style="display:none;">0</span>
+  </div>
+  <div class="dash-btn" onclick="showDaftarSiswa()">
+    <div class="dash-icon">👥</div>
+    <div class="dash-label">Kelola siswa</div>
+  </div>
+  <div class="dash-btn" onclick="showSyaratKhusus()">
+    <div class="dash-icon">✨</div>
+    <div class="dash-label">Syarat Khusus</div>
+  </div>
+  <div class="dash-btn placeholder" onclick="showPlaceholder()">
+    <div class="dash-icon">💰</div>
+    <div class="dash-label">Pengajuan dana</div>
+  </div>
+  <div class="dash-btn logout" onclick="doLogout()">
+    <div class="dash-icon">🚪</div>
+    <div class="dash-label">Keluar</div>
+  </div>
+</div>
+  <div class="dashboard-footer">
+    <button class="btn-logout" onclick="doLogout()">🚪 Keluar</button>
+  </div>
+</div>
+
+<!-- ABSEN SUBMENU -->
+<div id="absenMenuScreen">
+  <div class="submenu-header">
+    <button class="icon-btn" onclick="backToDashboard()">◀</button>
+    <div class="submenu-title">Pilih metode absen</div>
+    <div style="width:40px;"></div>
+  </div>
+  <div class="submenu-buttons">
+    <button class="submenu-btn" onclick="showFaceID()">
+      <div class="submenu-icon">📷</div>
+      <div>Face ID</div>
+      <div class="submenu-desc">Absen dengan scan wajah</div>
+    </button>
+    <button class="submenu-btn" onclick="showReelAttendance()">
+      <div class="submenu-icon">✋</div>
+      <div>Manual Input</div>
+      <div class="submenu-desc">Absen dengan pilih nama</div>
+    </button>
+  </div>
+</div>
+
+<!-- REGISTRATION SCREEN -->
+<div id="registrationScreen">
+  <div class="reg-header">
+    <button class="icon-btn" onclick="backToDashboard()">◀</button>
+    <div class="reg-title">Pendaftaran Ekskul</div>
+      </div>
+
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-label">MENUNGGU</div>
+      <div class="stat-value" id="regStatTotal">0</div>
+    </div>
+    <div class="stat-card stat-green">
+      <div class="stat-label">DITERIMA</div>
+      <div class="stat-value" id="regStatApproved">0</div>
+    </div>
+    <div class="stat-card stat-red">
+      <div class="stat-label">DITOLAK</div>
+      <div class="stat-value" id="regStatRejected">0</div>
+    </div>
+  </div>
+
+  <div class="reel-area">
+    <button class="nav-arrow nav-left" onclick="prevReg()">◀</button>
+    <div class="reel-container" id="regReelContainer">
+      <div class="empty-state" id="regEmptyState">
+        <div class="empty-state-icon">📭</div>
+        <div class="empty-state-text">Tidak ada pendaftar</div>
+      </div>
+    </div>
+    <button class="nav-arrow nav-right" onclick="nextReg()">▶</button>
+  </div>
+
+    <div class="bottom-bar">
+    <div class="period-pill" id="regPill">PENDAFTARAN</div>
+    <button class="btn-send-compact" id="regKirimBtn" onclick="submitRegistrations()">Kirim</button>
+    <button class="icon-btn" onclick="refreshRegistrations()" title="Refresh">🔄</button>
+  </div>
+  </div>
+
+<!-- MAIN -->
+<div id="mainApp">
+  <div class="app-header">
+  <button class="icon-btn" onclick="backToAbsenMenu()" title="Kembali">◀</button>
+  <div class="operator-info" style="flex:1; margin-left:12px;">
+    <div class="operator-name" id="operatorName">-</div>
+    <div class="operator-ekstra" id="operatorEkstra">-</div>
+  </div>
+  <div class="header-actions">
+    <button class="icon-btn" onclick="showList()" title="Daftar">📋</button>
+      </div>
+</div>
+
+  <!-- STATS BAR -->
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-label">TOTAL</div>
+      <div class="stat-value" id="statTotal">0</div>
+    </div>
+    <div class="stat-card stat-green">
+      <div class="stat-label">SUDAH</div>
+      <div class="stat-value" id="statHadir">0</div>
+      <div class="stat-sub" id="subHadir">0%</div>
+    </div>
+    <div class="stat-card stat-red">
+      <div class="stat-label">BELUM</div>
+      <div class="stat-value" id="statBelum">0</div>
+      <div class="stat-sub" id="subBelum">0%</div>
+    </div>
+  </div>
+
+  <!-- REEL AREA -->
+  <div class="reel-area">
+    <button class="nav-arrow nav-left" onclick="prevStudent()">◀</button>
+    
+    <div class="reel-container" id="reelContainer">
+      <div class="empty-state" id="emptyState">
+        <div class="empty-state-icon">📭</div>
+        <div class="empty-state-text">Tidak ada data siswa</div>
+      </div>
+    </div>
+    
+    <button class="nav-arrow nav-right" onclick="nextStudent()">▶</button>
+  </div>
+
+  
+  <!-- BOTTOM BAR -->
+    <!-- BOTTOM BAR -->
+  <div class="bottom-bar">
+    <div class="period-pill" id="periodPill">PAGI</div>
+    <button class="btn-search" onclick="openSearch()" title="Cari siswa">🔍</button>
+    <button class="btn-send-compact" id="kirimBtn" onclick="submitAttendance()">Kirim</button>
+  </div>
+</div>
+<!-- LIST -->
+<div id="listScreen">
+  <div class="list-header">
+    <div class="list-title">📋 Daftar Siswa</div>
+    <button class="icon-btn" onclick="hideList()">✕</button>
+  </div>
+  <div class="student-list" id="studentList"></div>
+</div>
+
+<!-- SUMMARY MODAL -->
+<div id="summaryModal" class="modal-overlay">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title">📊 Ringkasan Absensi</div>
+      <button class="icon-btn" onclick="closeSummary()">✕</button>
+    </div>
+    <div class="modal-body" id="summaryBody"></div>
+    <div class="modal-footer">
+      <button class="btn-primary" onclick="submitFromSummary()">Kirim Absensi</button>
+      <button class="btn-secondary" onclick="closeSummary()">Lanjutkan</button>
+    </div>
+  </div>
+</div>
+
+<!-- DAFTAR SISWA SCREEN -->
+<div id="daftarScreen" style="display:none;">
+  <div class="reg-header">
+    <button class="icon-btn" onclick="backToDashboardFromDaftar()">◀</button>
+    <div class="reg-title">Daftar Siswa di Ekskul</div>
+     </div>
+
+  <div class="daftar-top-bar">
+    <div class="daftar-count">
+      <span class="daftar-count-num" id="daftarStatTotal">0</span>
+      <span class="daftar-count-label">Jumlah siswa didalam kelas</span>
+    </div>
+    <div class="daftar-sort">
+  <select id="daftarSortSelect" class="sort-select" onchange="handleDaftarSort()">
+    <option value="hadir">Hadir</option>
+    <option value="alpha">Alpha</option>
+    <option value="terlambat">Terlambat</option>
+    <option value="pagi">Pagi</option>
+    <option value="kosong">Kosong</option>
+  </select>
+</div>
+  </div>
+
+  <div class="daftar-list-container" id="daftarList"></div>
+  <div class="empty-state" id="daftarEmpty" style="display:none;">
+    <div class="empty-state-icon">📭</div>
+    <div class="empty-state-text">Tidak ada siswa</div>
+  </div>
+</div>
+
+<!-- REMOVE CONFIRMATION MODAL -->
+<div id="removeModal" class="modal-overlay">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title">Keluarkan Siswa</div>
+      <button class="icon-btn" onclick="closeRemoveModal()">✕</button>
+    </div>
+    <div class="modal-body" style="text-align:center;padding:32px 20px;">
+      <div style="font-size:48px;margin-bottom:16px;">⚠️</div>
+      <div style="font-size:16px;font-weight:700;margin-bottom:8px;" id="removeStudentName">-</div>
+      <div style="font-size:13px;color:var(--text-secondary);margin-bottom:32px;">
+        Akan dikeluarkan dari ekskul ini. Siswa dapat mendaftar ekskul lain.
+      </div>
+      
+      <div class="remove-toggle-label">Geser untuk mengonfirmasi</div>
+      <div class="remove-toggle-track" id="removeToggleTrack">
+        <div class="remove-toggle-thumb">▶</div>
+      </div>
+      <input type="checkbox" id="removeToggle" style="display:none;">
+      
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeRemoveModal()">Batal</button>
+      <button class="btn-primary" id="removeConfirmBtn" onclick="confirmRemoveStudent()" disabled>Keluarkan</button>
+    </div>
+  </div>
+</div>
+
+<!-- STATUS -->
+<div class="status-overlay" id="statusOverlay" style="opacity:0;"></div>
+
+<!-- LOADING -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="loading-text">Memuat data...</div>
+</div>
+<!-- SEARCH OVERLAY -->
+<div id="searchOverlay" class="search-overlay">
+  <div class="search-sheet">
+    <div class="search-header">
+      <input type="text" id="searchInput" class="search-input" placeholder="Cari nama siswa..." oninput="handleSearch()">
+      <button class="icon-btn" onclick="closeSearch()">✕</button>
+    </div>
+    <div class="search-results" id="searchResults"></div>
+  </div>
+</div>  <!-- ← CLOSE SEARCH OVERLAY HERE -->
+
+<!-- ===== SYARAT KHUSUS SCREEN ===== -->
+<div id="syaratScreen" style="display:none;">
+  <div class="reg-header">
+    <button class="icon-btn" onclick="backToDashboardFromSyarat()">◀</button>
+    <div class="reg-title">Syarat Khusus</div>
+      </div>
+
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-label">TOTAL</div>
+      <div class="stat-value" id="syaratStatTotal">0</div>
+    </div>
+    <div class="stat-card stat-green">
+      <div class="stat-label">SUDAH</div>
+      <div class="stat-value" id="syaratStatDone">0</div>
+    </div>
+    <div class="stat-card stat-red">
+      <div class="stat-label">BELUM</div>
+      <div class="stat-value" id="syaratStatPending">0</div>
+    </div>
+  </div>
+
+  <div class="syarat-list-container" id="syaratList"></div>
+  
+  <div class="empty-state" id="syaratEmpty" style="display:none;">
+    <div class="empty-state-icon">📭</div>
+    <div class="empty-state-text">Tidak ada siswa</div>
+  </div>
+
+  <!-- Fixed bottom save bar -->
+  <div class="syarat-bottom-bar">
+    <div class="syarat-change-count" id="syaratChangeCount">0 perubahan</div>
+    <button class="btn-send-compact" id="syaratSaveBtn" onclick="submitSyaratChanges()" disabled>Simpan</button>
+  </div>
+</div>
+
+<!-- SCRIPTS -->
+<script src="main.js"></script>
+<script src="utils.js"></script>
+<script src="reel.js"></script>
+<script src="registration.js"></script>
+<script src="daftar.js"></script>
+<script src="syarat.js"></script>
+
+</body>
+</html>
