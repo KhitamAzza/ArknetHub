@@ -2,7 +2,10 @@
 const AUDIT_API_URL = "https://script.google.com/macros/s/AKfycbz0nTZE3SEQuoyBQVWI83du_9uDIpu3qZE5gbsqDQgvVVTNhw2CJvbnM460fjP5K03mzg/exec";
 
 async function openDanaModal() {
-  if (!currentOperator) return;
+  if (isMaster) {
+    showStatus("MASTER tidak dapat mengajukan dana", "info");
+    return;
+  }
 
   const loader = document.getElementById("danaLoadingOverlay");
   if (loader) {
