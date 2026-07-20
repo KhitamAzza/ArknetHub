@@ -14,7 +14,7 @@ const syaratSaveBtn = document.getElementById("syaratSaveBtn");
 // ===== SHOW SYARAT SCREEN =====
 function showSyaratKhusus() {
   if (isMaster) {
-    showStatus("MASTER tidak dapat mengubah syarat khusus", "info");
+    showStatus("MASTER tidak dapat mengakses syarat khusus", "info");
     return;
   }
   dashboardScreen.style.display = "none";
