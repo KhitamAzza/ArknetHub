@@ -16,7 +16,7 @@
 <div id="loginScreen">
   <div class="login-logo">📋</div>
   <div class="login-title">ArkNet Hub</div>
-  <div class="login-subtitle">Portal Pembina Ekskul SMK Diponegoro Tumpang</div>
+  <div class="login-subtitle">1 Platform untuk berbagai kebutuhan ekstrakurikuler</div>
   <input type="password" id="passwordInput" class="login-input" placeholder="Password" autocomplete="off" inputmode="verbatim">
   <button class="login-btn" onclick="doLogin()">Masuk</button>
   <div class="login-error" id="loginError">❌ Password salah</div>
@@ -47,10 +47,10 @@
     <div class="dash-icon">✨</div>
     <div class="dash-label">Syarat Khusus</div>
   </div>
-  <div class="dash-btn placeholder" onclick="showPlaceholder()">
-    <div class="dash-icon">📓</div>
-    <div class="dash-label">Pengajuan inventaris</div>
-  </div>
+  <div class="dash-btn" onclick="openDanaModal()">
+  <div class="dash-icon">💰</div>
+  <div class="dash-label">Pengajuan Dana</div>
+</div>
   <div class="dash-btn logout" onclick="doLogout()">
     <div class="dash-icon">🚪</div>
     <div class="dash-label">Keluar</div>
@@ -313,6 +313,73 @@
   </div>
 </div>
 
+
+<!-- PENGajuan DANA MODAL -->
+<div id="danaModal" class="modal-overlay">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title">💰 Ajukan Dana</div>
+      <button class="icon-btn" onclick="closeDanaModal()">✕</button>
+    </div>
+    <div class="modal-body">
+  <div class="form-group">
+    <label class="form-label">ID Transaksi</label>
+    <input type="text" id="danaId" class="form-input" readonly>
+  </div>
+  <div class="form-group">
+    <label class="form-label">Nama Kegiatan</label>
+    <input type="text" id="danaNama" class="form-input" placeholder="Contoh: Latihan Futsal" autocomplete="off">
+  </div>
+  <div class="form-group">
+    <label class="form-label">Jumlah</label>
+    <input type="text" id="danaJumlah" class="form-input" placeholder="Rp 0" autocomplete="off" oninput="formatDanaInput(this)">
+  </div>
+  <div class="dana-history-link" onclick="openDanaHistory()">📋 Lihat riwayat pengajuan →</div>
+</div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeDanaModal()">Batal</button>
+      <button class="btn-primary" id="danaKirimBtn" onclick="submitPengajuanDana()">Kirim</button>
+    </div>
+  </div>
+</div>
+<!-- DANA HISTORY SCREEN -->
+<div id="danaHistoryScreen" style="display:none;">
+  <div class="reg-header">
+    <button class="icon-btn" onclick="closeDanaHistory()">◀</button>
+    <div class="reg-title">Riwayat Pengajuan</div>
+    <div style="width:40px;"></div>
+  </div>
+
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-label">TOTAL</div>
+      <div class="stat-value" id="dhStatTotal">0</div>
+    </div>
+    <div class="stat-card stat-green">
+      <div class="stat-label">DISETUJUI</div>
+      <div class="stat-value" id="dhStatApproved">0</div>
+    </div>
+    <div class="stat-card stat-red">
+      <div class="stat-label">DITOLAK</div>
+      <div class="stat-value" id="dhStatRejected">0</div>
+    </div>
+  </div>
+
+  <div class="dana-history-list" id="danaHistoryList"></div>
+  
+  <div class="empty-state" id="danaHistoryEmpty" style="display:none;">
+    <div class="empty-state-icon">📭</div>
+    <div class="empty-state-text">Belum ada pengajuan</div>
+  </div>
+</div>
+<!-- DANA LOADING OVERLAY -->
+<div id="danaLoadingOverlay">
+  <div class="dana-loading-content">
+    <div class="spinner"></div>
+    <div class="dana-loading-text">Memuat pengajuan dana...</div>
+  </div>
+</div>
+
 <!-- SCRIPTS -->
 <script src="main.js"></script>
 <script src="utils.js"></script>
@@ -320,6 +387,7 @@
 <script src="registration.js"></script>
 <script src="daftar.js"></script>
 <script src="syarat.js"></script>
+<script src="dana.js"></script>
 
 </body>
 </html>
