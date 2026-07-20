@@ -18,6 +18,10 @@ const removeConfirmBtn = document.getElementById("removeConfirmBtn");
 
 // ===== SHOW DAFTAR SCREEN =====
 function showDaftarSiswa() {
+  if (isMaster) {
+    showStatus("MASTER tidak dapat mengakses kelola siswa", "info");
+    return;
+  }
   dashboardScreen.style.display = "none";
   daftarScreen.style.display = "flex";
   loadDaftarStudents();
