@@ -1,3 +1,5 @@
+const AUTO_SUBMIT_THRESHOLD = 20;
+
 // ===== STATS BAR =====
 function updateStats() {
   const total = totalStudents.length;
@@ -178,6 +180,7 @@ function setupSwipe(card) {
 }
 
 // ===== MARK ATTENDANCE =====
+// ===== MARK ATTENDANCE =====
 function markCurrentStudent() {
   const student = allStudents[currentIndex];
   if (!student) return;
@@ -218,6 +221,12 @@ function markCurrentStudent() {
   }
 
   updateStats();
+
+  // ===== AUTO-SUBMIT AT THRESHOLD =====
+  if (markedStudents.size >= AUTO_SUBMIT_THRESHOLD && !isSubmitting) {
+    showStatus(`📤 ${markedStudents.size} data, auto-mengirim...`, "info");
+    submitAttendance();
+  }
 
   setTimeout(() => {
     allStudents = allStudents.filter(s => !markedStudents.has(s.nama));
