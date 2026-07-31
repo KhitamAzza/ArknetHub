@@ -481,6 +481,7 @@ function renderConfigMenu() {
         { key: "ekstraStart", label: "Ekstra Mulai", type: "time" },
         { key: "ekstraEnd", label: "Ekstra Selesai", type: "time" },
         { key: "dendaAlpha", label: "Denda alpha", type: "money" },
+        { key: "dendaTerlambat", label: "Denda terlambat/pagi", type: "money" },
         { key: "nilaiMinusAlpha", label: "Nilai minus (Alpha)", type: "negative" },
         { key: "nilaiMinusTerlambat", label: "Nilai minus (Terlambat/Pagi)", type: "negative" }
       ]
