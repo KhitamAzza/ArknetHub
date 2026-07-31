@@ -412,6 +412,10 @@ async function saveFixerEdit() {
     return;
   }
 
+  // ✅ CAPTURE BEFORE CLEARING
+  const targetNama = fixerEditTarget.nama;
+  const targetDate = fixerEditTarget.date;
+
   closeFixerEdit();
   showLoading(true);
 
@@ -421,8 +425,8 @@ async function saveFixerEdit() {
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify({
         action: "updateAttendance",
-        nama: fixerEditTarget.nama,
-        date: fixerEditTarget.date,
+        nama: targetNama,        // ✅ use captured value
+        date: targetDate,
         status: newStatus,
         operator: currentOperator
       })
@@ -431,8 +435,7 @@ async function saveFixerEdit() {
     const data = await res.json();
     if (data.status === "ok") {
       showStatus("✓ Absensi diperbarui", "ok");
-      // Refresh student data
-      selectFixerStudent(fixerEditTarget.nama);
+      await selectFixerStudent(targetNama);  // ✅ use captured value
     } else {
       showStatus(data.message || "Gagal menyimpan", "error");
     }
