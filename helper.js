@@ -7,11 +7,11 @@ let allDatabaseStudents = [];  // predictive source
 let countdownInterval = null;
 
 // ===== SCREEN NAVIGATION =====
-function showHelperScreen() {
-  // hideAllScreens();
-  const el = document.getElementById("helperScreen");
-  if (el) el.style.display = "flex";
-}
+// function showHelperScreen() {
+//   // hideAllScreens();
+//   const el = document.getElementById("helperScreen");
+//   if (el) el.style.display = "flex";
+// }
 
 function backToHelper() {
   stopCountdown();
