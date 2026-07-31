@@ -95,7 +95,8 @@ function hideAllScreens() {
 }
 // ===== LOGIN / LOGOUT =====
 async function doLogin() {
-  const password = passwordInput.value.trim().toLowerCase();
+  const rawPassword = passwordInput.value.trim();
+  const password = rawPassword.toLowerCase();
 
   // Teacher / Pembina / Admin login
   if (OPERATORS[password]) {
@@ -143,13 +144,19 @@ async function doLogin() {
     const cfg = await res.json();
     showLoading(false);
 
-    if (cfg.status === "ok" && cfg.helperEnable && password === cfg.helperPassword) {
+    // FIX: case-insensitive comparison
+    const cfgPassword = String(cfg.helperPassword || "").trim();
+    const cfgEnable = String(cfg.helperEnable).toUpperCase() === "TRUE" || cfg.helperEnable === true;
+
+    if (cfg.status === "ok" && cfgEnable && rawPassword === cfgPassword) {
       isHelper = true;
       currentOperator = "Panitia";
       currentEkstra = "MASTER";
       isMaster = true;
 
-      showHelperScreen();
+      hideAllScreens();
+      const el = document.getElementById("helperScreen");
+      if (el) el.style.display = "flex";
       return;
     }
   } catch (e) {
@@ -161,7 +168,6 @@ async function doLogin() {
   passwordInput.value = "";
   passwordInput.focus();
 }
-
 // ===== NAVIGATION =====
 function showDashboard() {
   if (dashboardScreen) dashboardScreen.style.display = "flex";
