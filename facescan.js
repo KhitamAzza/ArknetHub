@@ -7,6 +7,8 @@
 let faceDescriptors = [];      // RAM cache from Database sheet
 let faceScanned = new Map();   // nama → {status, timestamp, kelas, ekstra}
 let faceAlreadySubmitted = new Set(); // names already in today's sheet
+let faceUnsentQueue = [];      // Queue of scans not yet confirmed by server
+let faceSyncedNames = new Set();  // Names confirmed saved on backend
 let faceVideoStream = null;
 let faceRecognitionInterval = null;
 let faceCameraFacing = 'environment';
@@ -15,8 +17,10 @@ let faceModelsLoaded = false;
 let faceScanScreenActive = false;
 let faceLocalStorageKey = "";
 let faceLastDetected = new Map(); // nama → timestamp (debounce dupes)
-const FACE_DEBOUNCE_MS = 3000;    // 3s cooldown between scans of same person
+let isSendingChunk = false;
+const FACE_DEBOUNCE_MS = 3000;
 const FACE_THRESHOLD = 0.6;
+const CHUNK_SIZE = 20;
 const FACE_MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
 const EXCLUDE_CAM_TERMS = ['wide', 'ultra', 'tele', 'macro', 'depth', '0.5x', '2x', '3x'];
 
@@ -104,21 +108,18 @@ async function initFaceScan() {
     }
   }
 
-  // 2. Single bundle load (replaces 3 separate calls)
+  // 2. Load bundle WITHOUT face descriptors (small & fast)
   showFaceLoading("Memuat data siswa...");
   try {
     const bundle = await loadBundle();
     if (!bundle) throw new Error("No bundle");
 
-    faceDescriptors = bundle.faceDescriptors || [];
     currentPeriod = bundle.period;
     totalStudents = bundle.students || [];
 
-    // Build submitted set
     faceAlreadySubmitted.clear();
     (bundle.todayLog || []).forEach(nama => faceAlreadySubmitted.add(nama));
 
-    // Sheet status
     sheetStatus.clear();
     totalStudents.forEach(s => { if (s.status) sheetStatus.set(s.nama, s.status); });
 
@@ -127,16 +128,31 @@ async function initFaceScan() {
     return;
   }
 
-  // 3. Restore session
-  restoreFaceSession();
+  // 3. Load face descriptors SEPARATELY (only for face scan)
+  showFaceLoading("Memuat data wajah...");
+  try {
+    await loadFaceDatabase();
+  } catch (err) {
+    showFaceLoadingError("Gagal memuat wajah: " + err.message);
+    return;
+  }
 
-  // 4. Start camera
+  // 4. Restore session from previous crash/refresh
+  restoreFaceSession();
+  faceUnsentQueue = Array.from(faceScanned.values()); // treat all as unsent
+  faceSyncedNames.clear();
+
+  // 5. If there are pending scans from before, auto-resume sending
+  if (faceUnsentQueue.length > 0) {
+    submitFaceChunk();
+  }
+
+  // 6. Start camera
   hideFaceLoading();
   await startFaceCamera();
   updateFaceStats();
   renderFaceScannedList();
 }
-
 
 // ===== LOAD FACE DATABASE =====
 async function loadFaceDatabase() {
@@ -243,7 +259,60 @@ function clearFaceSession() {
     localStorage.removeItem(faceLocalStorageKey);
   } catch (e) {}
 }
+async function submitFaceChunk() {
+  if (isSendingChunk || faceUnsentQueue.length === 0) return;
+  isSendingChunk = true;
 
+  const chunk = faceUnsentQueue.slice(0, CHUNK_SIZE);
+  const today = getJakartaDateString();
+  const scans = chunk.map(s => ({
+    nama: s.nama,
+    status: s.status,
+    timestamp: s.timestamp,
+    date: today
+  }));
+
+  try {
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({
+        action: "reelSubmit",
+        scans: scans,
+        operator: currentOperator,
+        mode: "FACE",
+        ekstra: currentEkstra
+      })
+    });
+
+    const data = await res.json();
+
+    if (data.status === "ok") {
+      // Remove sent items from queue
+      faceUnsentQueue.splice(0, chunk.length);
+      // Mark as synced
+      chunk.forEach(s => faceSyncedNames.add(s.nama));
+      clearBundle();
+
+      // If more queued, send next chunk immediately
+      if (faceUnsentQueue.length >= CHUNK_SIZE) {
+        isSendingChunk = false;
+        submitFaceChunk();
+        return;
+      }
+    } else {
+      console.error("Auto-send failed:", data.message);
+      showStatus("Auto-kirim gagal: " + data.message, "error");
+    }
+  } catch (err) {
+    console.error("Auto-send error:", err);
+    showStatus("Koneksi bermasalah, akan dicoba lagi", "error");
+  }
+
+  isSendingChunk = false;
+  updateFaceStats();
+  renderFaceScannedList();
+}
 // ===== CAMERA =====
 async function enumerateFaceCameras() {
   try {
@@ -472,37 +541,55 @@ function addFaceScan(student) {
     status = (sheetVal === "PAGI") ? "HADIR" : "TERLAMBAT";
   }
 
-  faceScanned.set(student.nama, {
+  const scanData = {
     nama: student.nama,
     kelas: student.kelas,
     ekstra: student.ekstra,
     status: status,
     timestamp: new Date().toISOString()
-  });
+  };
+
+  faceScanned.set(student.nama, scanData);
+  faceUnsentQueue.push(scanData);
 
   saveFaceSession();
   updateFaceStats();
   renderFaceScannedList();
 
-  // Visual feedback
+  // Auto-send when queue hits threshold
+  if (faceUnsentQueue.length >= CHUNK_SIZE) {
+    submitFaceChunk();
+  }
+
   showStatus("✓ " + student.nama, "ok");
 }
 
 // ===== STATS =====
 function updateFaceStats() {
   const refs = getFaceRefs();
-  const total = totalStudents.length || faceDescriptors.length;
-  const sudahSheet = faceAlreadySubmitted.size;
-  const sudahScan = faceScanned.size;
-  const sudahTotal = sudahSheet + sudahScan;
-  const belum = Math.max(0, total - sudahTotal);
+  const total = totalStudents.length;
+
+  // FIX: Only count students in the CURRENT ekskul/class
+  const sudahSheet = totalStudents.filter(s => faceAlreadySubmitted.has(s.nama)).length;
+  const sudahScan = Array.from(faceScanned.keys()).filter(n => 
+    totalStudents.some(s => s.nama === n)
+  ).length;
+
+  // Unique "done" count — avoid double-counting if a student is both in sheet AND scanned
+  const sudahSet = new Set();
+  totalStudents.forEach(s => { 
+    if (faceAlreadySubmitted.has(s.nama)) sudahSet.add(s.nama); 
+  });
+  faceScanned.forEach((_, nama) => {
+    if (totalStudents.some(s => s.nama === nama)) sudahSet.add(nama);
+  });
+  const belum = Math.max(0, total - sudahSet.size);
 
   if (refs.statTotal) refs.statTotal.textContent = total;
   if (refs.statSudah) refs.statSudah.textContent = sudahScan;
   if (refs.statBelum) refs.statBelum.textContent = belum;
   if (refs.statSudahSheet) refs.statSudahSheet.textContent = sudahSheet;
 }
-
 // ===== SCANNED LIST =====
 function renderFaceScannedList() {
   const refs = getFaceRefs();
@@ -521,100 +608,75 @@ function renderFaceScannedList() {
 
   if (empty) empty.style.display = "none";
 
-  // Sort by timestamp desc
   scans.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-  list.innerHTML = scans.map(s => `
-    <div class="face-scanned-item">
-      <div class="face-scanned-avatar">👤</div>
-      <div class="face-scanned-info">
-        <div class="face-scanned-name">${escapeHtml(s.nama)}</div>
-        <div class="face-scanned-meta">${escapeHtml(s.kelas)} • ${escapeHtml(s.status)}</div>
+  list.innerHTML = scans.map(s => {
+    const isSynced = faceSyncedNames.has(s.nama);
+    const isPending = faceUnsentQueue.some(u => u.nama === s.nama);
+    const icon = isSynced ? "🟢" : isPending ? "🟠" : "⚪";
+    const meta = isSynced ? "Tersimpan" : isPending ? "Menunggu..." : "Baru";
+
+    return `
+      <div class="face-scanned-item">
+        <div class="face-scanned-avatar">${icon}</div>
+        <div class="face-scanned-info">
+          <div class="face-scanned-name">${escapeHtml(s.nama)}</div>
+          <div class="face-scanned-meta">${escapeHtml(s.kelas)} • ${escapeHtml(s.status)} • ${meta}</div>
+        </div>
+        <button class="face-scanned-remove" onclick="removeFaceScan('${escapeHtml(s.nama)}')" title="Hapus">✕</button>
       </div>
-      <button class="face-scanned-remove" onclick="removeFaceScan('${escapeHtml(s.nama)}')" title="Hapus">✕</button>
-    </div>
-  `).join("");
+    `;
+  }).join("");
 }
 
 function removeFaceScan(nama) {
   faceScanned.delete(nama);
+  faceSyncedNames.delete(nama);
+  faceUnsentQueue = faceUnsentQueue.filter(s => s.nama !== nama);
   saveFaceSession();
   updateFaceStats();
   renderFaceScannedList();
 }
-
 // ===== SUBMIT =====
 async function submitFaceScans() {
+  // 1. Flush any remaining queue first
+  if (faceUnsentQueue.length > 0) {
+    await submitFaceChunk();
+  }
+
+  // 2. If queue still has items (failed), don't clear anything
+  if (faceUnsentQueue.length > 0) {
+    showStatus("Beberapa data gagal dikirim, coba lagi", "error");
+    return;
+  }
+
   if (faceScanned.size === 0) {
     showStatus("Belum ada siswa yang discan", "error");
     return;
   }
 
-  const refs = getFaceRefs();
-  if (refs.btnSimpan) refs.btnSimpan.disabled = true;
-  showLoading(true);
-
-  try {
-    const scans = [];
-    const now = new Date().toISOString();
-    const today = getJakartaDateString();
-
-    faceScanned.forEach((data, nama) => {
-      scans.push({
-        nama: data.nama,
-        status: data.status,
-        timestamp: now,
-        date: today
-      });
-    });
-
-    const payload = {
-      action: "reelSubmit",
-      scans: scans,
-      operator: currentOperator,
-      mode: "FACE",
-      ekstra: currentEkstra
-    };
-
-    const res = await fetch(API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(payload)
-    });
-
-    const data = await res.json();
-
-clearBundle(); 
-    if (data.status === "ok") {
-      showStatus("✓ " + data.processed + " data terkirim", "ok");
-      clearFaceSession();
-      faceScanned.clear();
-      updateFaceStats();
-      renderFaceScannedList();
-      // Refresh submitted set
-      await loadTodaySubmitted();
-      updateFaceStats();
-    } else {
-      showStatus(data.message || "Gagal mengirim", "error");
-    }
-  } catch (err) {
-    console.error(err);
-    showStatus("Error koneksi: " + err.message, "error");
-  }
-
-  showLoading(false);
-  if (refs.btnSimpan) refs.btnSimpan.disabled = false;
+  showStatus("✓ Semua data terkirim", "ok");
+  clearFaceSession();
+  faceScanned.clear();
+  faceUnsentQueue = [];
+  faceSyncedNames.clear();
+  updateFaceStats();
+  renderFaceScannedList();
+  await loadTodaySubmitted();
+  updateFaceStats();
 }
 
 function batalFaceScan() {
-  if (faceScanned.size > 0) {
-    if (!confirm("Batalkan semua scan? Data belum tersimpan akan hilang.")) return;
+  const unsentCount = faceUnsentQueue.length;
+  if (unsentCount > 0) {
+    if (!confirm(`Batalkan? ${unsentCount} siswa belum terkirim dan akan hilang.`)) return;
   }
   clearFaceSession();
   faceScanned.clear();
+  faceUnsentQueue = [];
+  faceSyncedNames.clear();
   backFromFaceScan();
 }
-
 // ===== LOADING OVERLAY =====
 function showFaceLoading(text) {
   const refs = getFaceRefs();
