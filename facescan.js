@@ -117,12 +117,23 @@ async function initFaceScan() {
     currentPeriod = bundle.period;
     totalStudents = bundle.students || [];
 
-    faceAlreadySubmitted.clear();
-    (bundle.todayLog || []).forEach(nama => faceAlreadySubmitted.add(nama));
+      sheetStatus.clear();
+  totalStudents.forEach(s => { if (s.status) sheetStatus.set(s.nama, s.status); });
 
-    sheetStatus.clear();
-    totalStudents.forEach(s => { if (s.status) sheetStatus.set(s.nama, s.status); });
+  // FIX: derive "already submitted" from the actual cell + current period
+  // (same logic as reel.js updateStats())
+  faceAlreadySubmitted.clear();
+  totalStudents.forEach(s => {
+    const st = (sheetStatus.get(s.nama) || "").trim();
+    if (!st) return;
 
+    if (currentPeriod?.isPagi && ["PAGI", "HADIR", "TERLAMBAT"].includes(st)) {
+      faceAlreadySubmitted.add(s.nama);
+    } else if (currentPeriod?.isEkstra && ["HADIR", "TERLAMBAT"].includes(st)) {
+      faceAlreadySubmitted.add(s.nama);
+    }
+  });
+  
   } catch (err) {
     showFaceLoadingError("Gagal memuat data: " + err.message);
     return;
