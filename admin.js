@@ -244,30 +244,31 @@ function confirmSendWa() {
 /* ===== FONNTE — automatic send to wali kelas ===== */
 
 async function sendReportFonnte() {
-  const dateSelect = document.getElementById("overseerDateSelect");
-  const selectedDate = dateSelect ? dateSelect.value : getJakartaDateString();
-  if (!selectedDate) { alert("Pilih tanggal terlebih dahulu"); return; }
+  alert("Fitur ini dimatikan");
+    // const dateSelect = document.getElementById("overseerDateSelect");
+  // const selectedDate = dateSelect ? dateSelect.value : getJakartaDateString();
+  // if (!selectedDate) { alert("Pilih tanggal terlebih dahulu"); return; }
 
-  if (!confirm(`Kirim laporan ${selectedDate} ke semua wali kelas via Fonnte?`)) return;
+  // if (!confirm(`Kirim laporan ${selectedDate} ke semua wali kelas via Fonnte?`)) return;
 
-  if (typeof showLoading === "function") showLoading(true);
-  try {
-    const res = await fetch(API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ action: "sendReportToWaliKelas", date: selectedDate })
-    });
-    const json = await res.json();
-    if (json.status !== "ok") {
-      alert("Gagal: " + (json.message || "unknown"));
-      return;
-    }
-    showFonnteResult(json.results || []);
-  } catch (err) {
-    alert("Error koneksi: " + err.message);
-  } finally {
-    if (typeof showLoading === "function") showLoading(false);
-  }
+  // if (typeof showLoading === "function") showLoading(true);
+  // try {
+  //   const res = await fetch(API_URL, {
+  //     method: "POST",
+  //     headers: { "Content-Type": "text/plain;charset=utf-8" },
+  //     body: JSON.stringify({ action: "sendReportToWaliKelas", date: selectedDate })
+  //   });
+  //   const json = await res.json();
+  //   if (json.status !== "ok") {
+  //     alert("Gagal: " + (json.message || "unknown"));
+  //     return;
+  //   }
+  //   showFonnteResult(json.results || []);
+  // } catch (err) {
+  //   alert("Error koneksi: " + err.message);
+  // } finally {
+  //   if (typeof showLoading === "function") showLoading(false);
+  // }
 }
 
 function showFonnteResult(results) {
