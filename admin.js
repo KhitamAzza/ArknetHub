@@ -6,98 +6,112 @@
 let overseerData = [];
 let waReportText = "";
 
-// ===== OVERSEER VIEW =====
+/* ===== OVERSEER SCREEN — date-driven load ===== */
 
-function showOverseerView() {
-hideAllScreens();
-  const el = document.getElementById("overseerScreen");
-  if (el) {
-    el.style.display = "flex";
-    loadOverseerData();
-  }
-}
+async function populateOverseerDateDropdown() {
+  const dateSelect = document.getElementById("overseerDateSelect");
+  if (!dateSelect) return;
 
-function showFixerMode() {
-hideAllScreens();
-  const el = document.getElementById("fixerScreen");
-  if (el) {
-    el.style.display = "flex";
-    initFixerMode();
-  }
-}
-
-function showConfigMenu() {
-hideAllScreens();
-  const el = document.getElementById("configScreen");
-  if (el) {
-    el.style.display = "flex";
-    initConfigMenu();
-  }
-}
-function showAdminAbsen() {
-  currentMode = 'REEL';
-  isMaster = true;
-  currentEkstra = "MASTER";
-  hideAllScreens();
-  if (absenMenuScreen) absenMenuScreen.style.display = "flex";
-}
-async function loadOverseerData() {
-  showLoading(true);
   try {
-    const today = getJakartaDateString();
-    const res = await fetch(API_URL + "?action=getOverseerData&date=" + encodeURIComponent(today));
-    const data = await res.json();
+    const res = await fetch(`${API_URL}?action=getAvailableDates`);
+    const json = await res.json();
+    if (json.status !== "ok") return;
 
-    if (data.status === "ok") {
-      overseerData = data.ekskuls || [];
-      renderOverseerList(data.period);
-    } else {
-      showStatus(data.message || "Gagal memuat data", "error");
+    const prevValue = dateSelect.value;
+    dateSelect.innerHTML = "";
+    (json.dates || []).forEach(d => {
+      const opt = document.createElement("option");
+      opt.value = d;
+      opt.textContent = d;
+      dateSelect.appendChild(opt);
+    });
+
+    // keep previous selection if still valid, else default to newest (first in list)
+    if (prevValue && (json.dates || []).includes(prevValue)) {
+      dateSelect.value = prevValue;
+    }
+
+    // load data for whatever ended up selected (newest by default)
+    if (dateSelect.value) {
+      await loadOverseerData(dateSelect.value);
     }
   } catch (err) {
-    showStatus("Error koneksi: " + err.message, "error");
+    console.error("Gagal memuat daftar tanggal:", err);
   }
-  showLoading(false);
 }
 
-function renderOverseerList(period) {
+async function loadOverseerData(date) {
+  const dateSelect = document.getElementById("overseerDateSelect");
+  const targetDate = date || (dateSelect ? dateSelect.value : null) || getJakartaDateString();
+
+  if (typeof showLoading === "function") showLoading(true);
+  try {
+    const res = await fetch(`${API_URL}?action=getOverseerData&date=${encodeURIComponent(targetDate)}`);
+    const json = await res.json();
+    if (json.status !== "ok") {
+      overseerData = [];
+      renderOverseerList([]);
+      return;
+    }
+    overseerData = json.ekskuls || [];
+
+    const periodLabel = document.getElementById("overseerPeriodLabel");
+    if (periodLabel) {
+      periodLabel.textContent = json.period?.isPagi ? "Periode PAGI"
+        : json.period?.isEkstra ? "Periode EKSTRA"
+        : "Di luar jam absensi";
+    }
+
+    renderOverseerList(overseerData);
+  } catch (err) {
+    console.error("Gagal memuat data overseer:", err);
+    overseerData = [];
+    renderOverseerList([]);
+  } finally {
+    if (typeof showLoading === "function") showLoading(false);
+  }
+}
+
+function renderOverseerList(ekskuls) {
   const list = document.getElementById("overseerList");
   const empty = document.getElementById("overseerEmpty");
-  const periodLabel = document.getElementById("overseerPeriodLabel");
+  if (!list) return;
 
-  if (periodLabel) {
-    const name = period?.isPagi ? "PAGI" : period?.isEkstra ? "EKSTRA" : "DI LUAR JAM";
-    periodLabel.textContent = "Periode: " + name;
-  }
+  list.innerHTML = "";
 
-  if (!overseerData.length) {
-    if (list) list.innerHTML = "";
+  if (!ekskuls || ekskuls.length === 0) {
     if (empty) empty.style.display = "block";
     return;
   }
-
   if (empty) empty.style.display = "none";
 
-  if (list) {
-    list.innerHTML = overseerData.map(e => {
-      const pct = e.total > 0 ? Math.round((e.sudah / e.total) * 100) : 0;
-      const isDone = e.sudah >= e.threshold;
-      return `
-        <div class="overseer-item">
-          <div class="overseer-info">
-            <div class="overseer-name">${escapeHtml(e.nama)}</div>
-            <div class="overseer-meta">${e.sudah}/${e.total} siswa • ${e.pembina || '-'}</div>
-          </div>
-          <div class="overseer-progress">
-            <div class="overseer-progress-bar" style="width:${pct}%; background:${isDone ? 'var(--green)' : 'var(--red)'}"></div>
-          </div>
-          <div class="overseer-status">
-            <div class="overseer-dot ${isDone ? 'done' : 'not-done'}"></div>
-            <div class="overseer-status-text ${isDone ? 'done' : 'not-done'}">${isDone ? 'Selesai' : 'Belum'}</div>
-          </div>
-        </div>
-      `;
-    }).join("");
+  ekskuls.forEach(ek => {
+    const pct = ek.total ? Math.round((ek.sudah / ek.total) * 100) : 0;
+    const done = ek.sudah >= ek.total && ek.total > 0;
+
+    const item = document.createElement("div");
+    item.className = "overseer-item";
+    item.innerHTML = `
+      <div class="overseer-info">
+        <div class="overseer-name">${ek.nama}</div>
+        <div class="overseer-meta">${ek.pembina} · ${ek.sudah}/${ek.total} sudah absen</div>
+      </div>
+      <div class="overseer-progress">
+        <div class="overseer-progress-bar" style="width:${pct}%"></div>
+      </div>
+      <div class="overseer-status">
+        <div class="overseer-dot ${done ? "done" : "not-done"}"></div>
+        <div class="overseer-status-text ${done ? "done" : "not-done"}">${pct}%</div>
+      </div>
+    `;
+    list.appendChild(item);
+  });
+}
+
+function onOverseerDateChange() {
+  const dateSelect = document.getElementById("overseerDateSelect");
+  if (dateSelect && dateSelect.value) {
+    loadOverseerData(dateSelect.value);
   }
 }
 
@@ -105,15 +119,17 @@ function renderOverseerList(period) {
 async function fillAlphaAll() {
   if (!confirm("Isi ALPHA untuk semua siswa yang belum absen hari ini?")) return;
 
+  const dateSelect = document.getElementById("overseerDateSelect");
+  const targetDate = (dateSelect ? dateSelect.value : null) || getJakartaDateString();
+
   showLoading(true);
   try {
-    const today = getJakartaDateString();
     const res = await fetch(API_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify({
         action: "fillAlphaAll",
-        date: today,
+        date: targetDate,
         operator: currentOperator
       })
     });
@@ -121,7 +137,7 @@ async function fillAlphaAll() {
     const data = await res.json();
     if (data.status === "ok") {
       showStatus(`✓ ${data.filled} siswa diisi ALPHA`, "ok");
-      loadOverseerData();
+      loadOverseerData(targetDate);
     } else {
       showStatus(data.message || "Gagal", "error");
     }
@@ -131,28 +147,54 @@ async function fillAlphaAll() {
   showLoading(false);
 }
 
-// ===== WA REPORT =====
-function openWaReport() {
-  const today = getJakartaDateString();
-  const period = currentPeriod?.isPagi ? "PAGI" : currentPeriod?.isEkstra ? "EKSTRA" : "UNKNOWN";
+/* ===== WA REPORT — manual (preview + open wa.me) ===== */
 
-  // Build report: group by kelas, only show TERLAMBAT/PAGI/ALPHA/empty
+async function openWaReport() {
+  const dateSelect = document.getElementById("overseerDateSelect");
+  const selectedDate = dateSelect ? dateSelect.value : getJakartaDateString();
+
+  if (!selectedDate) {
+    alert("Pilih tanggal terlebih dahulu");
+    return;
+  }
+
+  if (typeof showLoading === "function") showLoading(true);
+
+  let ekskuls;
+  try {
+    // Always fetch fresh data for the SELECTED date — don't trust
+    // whatever overseerData happens to hold from a previous load.
+    const res = await fetch(`${API_URL}?action=getOverseerData&date=${encodeURIComponent(selectedDate)}`);
+    const json = await res.json();
+
+    if (json.status !== "ok") {
+      alert("Gagal memuat data laporan: " + (json.message || "Unknown error"));
+      return;
+    }
+    ekskuls = json.ekskuls || [];
+  } catch (err) {
+    alert("Error koneksi: " + err.message);
+    return;
+  } finally {
+    if (typeof showLoading === "function") showLoading(false);
+  }
+
+  // Build report: group by kelas, ONLY ALPHA / TERLAMBAT / PAGI
   const reportLines = [];
-  reportLines.push(`📊 *Laporan Absensi — ${today}*`);
-  reportLines.push(`Periode: *${period}*`);
+  reportLines.push(`Laporan kehadiran ekskul ${selectedDate}`);
   reportLines.push("");
 
-  // Collect all students from overseer data
   const allStudents = [];
-  overseerData.forEach(ek => {
+  ekskuls.forEach(ek => {
     (ek.students || []).forEach(s => {
       const st = (s.status || "").trim().toUpperCase();
-      if (!st || st === "ALPHA" || st === "TERLAMBAT" || st === "PAGI") {
+      // STRICT: only these 3 statuses. HADIR / IZIN / SAKIT / empty are ignored.
+      if (st === "ALPHA" || st === "TERLAMBAT" || st === "PAGI") {
         allStudents.push({
           nama: s.nama,
           kelas: s.kelas,
           ekstra: ek.nama,
-          status: st || "ALPHA"
+          status: st
         });
       }
     });
@@ -167,16 +209,16 @@ function openWaReport() {
 
   const sortedKelas = Object.keys(byKelas).sort();
   sortedKelas.forEach(kelas => {
-    reportLines.push(`*${kelas}*`);
+    reportLines.push(`${kelas}`);
+    reportLines.push("");
     byKelas[kelas].forEach(s => {
-      const icon = s.status === "ALPHA" ? "🔴" : s.status === "TERLAMBAT" ? "🟡" : "🔵";
-      reportLines.push(`${icon} ${s.nama} — ${s.ekstra} — ${s.status}`);
+      reportLines.push(`- ${s.nama} - ${s.ekstra} - ${s.status}`);
     });
     reportLines.push("");
   });
 
   if (allStudents.length === 0) {
-    reportLines.push("✅ Semua siswa hadir!");
+    reportLines.push(`Tidak ada siswa dengan status ALPHA, TERLAMBAT, atau PAGI pada tanggal ${selectedDate}.`);
   }
 
   waReportText = reportLines.join("\n");
@@ -197,6 +239,57 @@ function confirmSendWa() {
   const encoded = encodeURIComponent(waReportText);
   window.open(`https://wa.me/?text=${encoded}`, "_blank");
   closeWaPreview();
+}
+
+/* ===== FONNTE — automatic send to wali kelas ===== */
+
+async function sendReportFonnte() {
+  const dateSelect = document.getElementById("overseerDateSelect");
+  const selectedDate = dateSelect ? dateSelect.value : getJakartaDateString();
+  if (!selectedDate) { alert("Pilih tanggal terlebih dahulu"); return; }
+
+  if (!confirm(`Kirim laporan ${selectedDate} ke semua wali kelas via Fonnte?`)) return;
+
+  if (typeof showLoading === "function") showLoading(true);
+  try {
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "sendReportToWaliKelas", date: selectedDate })
+    });
+    const json = await res.json();
+    if (json.status !== "ok") {
+      alert("Gagal: " + (json.message || "unknown"));
+      return;
+    }
+    showFonnteResult(json.results || []);
+  } catch (err) {
+    alert("Error koneksi: " + err.message);
+  } finally {
+    if (typeof showLoading === "function") showLoading(false);
+  }
+}
+
+function showFonnteResult(results) {
+  const body = document.getElementById("fonnteResultBody");
+  if (body) {
+    body.innerHTML = results.map(r => `
+      <div class="fonnte-result-row">
+        <div>
+          <div class="fonnte-result-kelas">${r.kelas}</div>
+          <div class="fonnte-result-wali">${r.wali || "-"} · ${r.nomor || ""}</div>
+          ${r.reason ? `<div class="fonnte-result-reason">${r.reason}</div>` : ""}
+        </div>
+        <div class="fonnte-result-status ${r.status}">${r.status}</div>
+      </div>
+    `).join("");
+  }
+  const modal = document.getElementById("fonnteResultModal");
+  if (modal) modal.classList.add("visible");
+}
+function closeFonnteResult() {
+  const modal = document.getElementById("fonnteResultModal");
+  if (modal) modal.classList.remove("visible");
 }
 
 // ===== FIXER MODE =====
