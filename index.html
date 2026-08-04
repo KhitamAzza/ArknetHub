@@ -88,11 +88,11 @@
       <div class="dash-label">Config Menu</div>
       <div class="dash-desc">Pengaturan sistem</div>
     </div>
-    <div class="dash-btn" onclick="showOverseerView()">
-      <div class="dash-icon">👁️</div>
-      <div class="dash-label">Overseer View</div>
-      <div class="dash-desc">Pantau ekskul</div>
-    </div>
+    <div class="dash-btn" onclick="showOverseerView(); populateOverseerDateDropdown();">
+  <div class="dash-icon">👁️</div>
+  <div class="dash-label">Overseer View</div>
+  <div class="dash-desc">Pantau ekskul</div>
+</div>
     <div class="dash-btn placeholder">
       <div class="dash-icon">❔</div>
       <div class="dash-label">Fitur yang akan datang</div>
@@ -114,6 +114,11 @@
     </div>
   </div>
 
+  <div class="overseer-date-bar">
+    <label for="overseerDateSelect" class="overseer-date-label">📅 Tanggal</label>
+    <select id="overseerDateSelect" class="overseer-date-select" onchange="onOverseerDateChange()"></select>
+  </div>
+
   <div class="overseer-list" id="overseerList"></div>
   <div class="empty-state" id="overseerEmpty" style="display:none;">
     <div class="empty-state-icon">📭</div>
@@ -124,9 +129,25 @@
     <button class="btn-alpha-fill" id="alphaFillBtn" onclick="fillAlphaAll()">
       <span>⚠️</span> Isi ALPHA
     </button>
-    <button class="fab-wa" id="fabWaBtn" onclick="openWaReport()">
+    <button class="fab-wa" id="fabWaBtn" onclick="openWaReport()" title="Kirim Manual">
       <span>💬</span>
     </button>
+    <button class="fab-fonnte" id="fabFonnteBtn" onclick="sendReportFonnte()" title="Kirim Otomatis ke Wali Kelas">
+      <span>🤖</span>
+    </button>
+  </div>
+</div>
+<!-- FONNTE SEND RESULT MODAL -->
+<div id="fonnteResultModal" class="modal-overlay">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title">🤖 Hasil Pengiriman Otomatis</div>
+      <button class="icon-btn" onclick="closeFonnteResult()">✕</button>
+    </div>
+    <div class="modal-body" id="fonnteResultBody"></div>
+    <div class="modal-footer">
+      <button class="btn-primary" onclick="closeFonnteResult()">Tutup</button>
+    </div>
   </div>
 </div>
 
