@@ -60,6 +60,8 @@ function showFaceID() {
 
   refs.screen.style.display = "flex";
   faceScanScreenActive = true;
+  activateBackGuard('face');   // ← ADD THIS
+  activateBackTrap('face');
   initFaceScan();
 }
 
@@ -671,6 +673,7 @@ async function submitFaceScans() {
   faceScanned.clear();
   faceUnsentQueue = [];
   faceSyncedNames.clear();
+  deactivateBackTrap();
   updateFaceStats();
   renderFaceScannedList();
   await loadTodaySubmitted();
