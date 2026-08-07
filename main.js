@@ -209,21 +209,6 @@ function backToAdmin() {
   showAdminScreen();
 }
 
-// function backToDashboard() {
-//   mainApp.style.display = "none";
-//   absenMenuScreen.style.display = "none";
-//   registrationScreen.style.display = "none";
-//   listScreen.style.display = "none";
-//   if (isMaster) {
-//     showAdminScreen();
-//   } else if (isHelper) {
-//     showHelperScreen();
-//   } else {
-//     showDashboard();
-//   }
-//   updateRegBadge();
-// }
-
 function backToAbsenMenu() {
   mainApp.style.display = "none";
   listScreen.style.display = "none";
@@ -386,29 +371,6 @@ function showHelperScreen() {
   if (el) el.style.display = "flex";
 }
 
-// function backToDashboard() {
-//   if (isHelper) {
-//     showHelperScreen();
-//   } else if (isMaster) {
-//     showAdminScreen();
-//   } else {
-//     showDashboard();
-//   }
-//   updateRegBadge();
-// }
-
-// function backToAbsenMenu() {
-//   hideAllScreens();
-//   if (isHelper) {
-//     showHelperScreen();
-//   } else if (isMaster) {
-//     showAdminScreen();
-//   } else {
-//     if (absenMenuScreen) absenMenuScreen.style.display = "flex";
-//   }
-//   currentMode = null;
-// }
-
 function backToAdmin() {
   showAdminScreen();
 }
@@ -443,21 +405,10 @@ function showReelAttendance() {
   currentMode = 'REEL';
   absenMenuScreen.style.display = "none";
   mainApp.style.display = "flex";
+  activateBackGuard('reel');   // ← ADD THIS
+  activateBackTrap('reel');
   loadStudents();
 }
-
-// function backToAbsenMenu() {
-//   mainApp.style.display = "none";
-//   listScreen.style.display = "none";
-//   summaryModal.classList.remove("visible");
-//   closeSearch();
-//   if (isHelper) {
-//     showHelperScreen();
-//   } else {
-//     absenMenuScreen.style.display = "flex";
-//   }
-//   currentMode = null;
-// }
 
 // AFTER
 function showFaceID() {
@@ -654,3 +605,138 @@ fetch(API_URL + "?action=getConfig")
     }
   })
   .catch(() => {});
+
+/* ============================================
+   BACK BUTTON FAILSAFE
+   Blocks hardware back & on-screen back
+   when unsent attendance data exists
+   ============================================ */
+
+let backGuardScreen = null;
+let backBlockScreen = null;
+
+function hasUnsentData() {
+  if (typeof markedStudents !== 'undefined' && markedStudents.size > 0) return true;
+  if (typeof faceUnsentQueue !== 'undefined' && faceUnsentQueue.length > 0) return true;
+  return false;
+}
+
+function activateBackGuard(screen) {
+  backGuardScreen = screen;
+  history.pushState({screen: screen}, '');
+}
+
+function showBackBlockModal(screen) {
+  backBlockScreen = screen;
+  const countEl = document.getElementById('backBlockCount');
+  if (countEl) {
+    let count = 0;
+    if (screen === 'reel' && typeof markedStudents !== 'undefined') count = markedStudents.size;
+    if (screen === 'face' && typeof faceUnsentQueue !== 'undefined') count = faceUnsentQueue.length;
+    countEl.textContent = count;
+  }
+  const modal = document.getElementById('backBlockModal');
+  if (modal) modal.classList.add('visible');
+}
+
+function dismissBackBlock() {
+  const modal = document.getElementById('backBlockModal');
+  if (modal) modal.classList.remove('visible');
+  if (backBlockScreen) {
+    activateBackGuard(backBlockScreen);
+  }
+  backBlockScreen = null;
+}
+
+function confirmBackBlock() {
+  const modal = document.getElementById('backBlockModal');
+  if (modal) modal.classList.remove('visible');
+  
+  backGuardScreen = null; // disarm
+  
+  if (backBlockScreen === 'reel') {
+    if (typeof markedStudents !== 'undefined') markedStudents.clear();
+    backToAbsenMenu();
+  } else if (backBlockScreen === 'face') {
+    if (typeof faceScanned !== 'undefined') faceScanned.clear();
+    if (typeof faceUnsentQueue !== 'undefined') faceUnsentQueue = [];
+    backFromFaceScan();
+  }
+  backBlockScreen = null;
+}
+
+// Safe wrappers for on-screen back buttons
+function safeBackToAbsenMenu() {
+  if (mainApp.style.display !== 'none' && hasUnsentData()) {
+    showBackBlockModal('reel');
+    return;
+  }
+  backGuardScreen = null;
+  backToAbsenMenu();
+}
+
+function safeBackFromFaceScan() {
+  const faceScreen = document.getElementById('faceScanScreen');
+  if (faceScreen && faceScreen.style.display !== 'none' && hasUnsentData()) {
+    showBackBlockModal('face');
+    return;
+  }
+  backGuardScreen = null;
+  backFromFaceScan();
+}
+
+// Hardware back button interceptor
+window.addEventListener('popstate', (e) => {
+  const screen = e.state?.screen;
+  if (!screen || screen !== backGuardScreen) return;
+
+  if (hasUnsentData()) {
+    showBackBlockModal(screen);
+    activateBackGuard(screen);
+  } else {
+    backGuardScreen = null;
+    if (screen === 'reel') backToAbsenMenu();
+    else if (screen === 'face') backFromFaceScan();
+  }
+});
+
+// Refresh / close tab warning
+window.addEventListener('beforeunload', (e) => {
+  if (hasUnsentData()) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
+/* ============================================
+   PHONE BACK BUTTON FAILSAFE
+   ============================================ */
+
+let backTrapActive = false;
+
+function activateBackTrap(screenName) {
+  backTrapActive = true;
+  // Push a dummy state so the next back press fires popstate
+  history.pushState({ guard: screenName }, "", location.href);
+}
+
+function deactivateBackTrap() {
+  backTrapActive = false;
+}
+
+// Hardware back button interceptor (Android)
+window.addEventListener("popstate", (e) => {
+  if (!backTrapActive) return;
+
+  const hasData = (typeof markedStudents !== 'undefined' && markedStudents.size > 0) ||
+                  (typeof faceUnsentQueue !== 'undefined' && faceUnsentQueue.length > 0);
+
+  if (hasData) {
+    // Re-trap immediately so the next back press is caught again
+    history.pushState({ guard: true }, "", location.href);
+    showBackBlockModal(e.state?.guard || 'reel');
+  } else {
+    deactivateBackTrap();
+    // Let it go back normally
+    history.back();
+  }
+});
