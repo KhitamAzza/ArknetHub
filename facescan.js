@@ -73,14 +73,14 @@ function hideFaceScan() {
 function backFromFaceScan() {
   hideFaceScan();
   if (currentMode) {
-    if (isHelper) {
-      showHelperScreen();
-    } else {
-      backToAbsenMenu();
-    }
+    backToAbsenMenu();
   } else {
     if (isHelper) {
       showHelperScreen();
+    } else if (currentOperator && currentOperator.startsWith("Ketua ")) {
+      showKetuaDashboard();
+    } else if (isMaster) {
+      showAdminScreen();
     } else {
       showDashboard();
     }
