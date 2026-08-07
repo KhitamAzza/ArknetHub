@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="facescan.css">
   <link rel="stylesheet" href="helper.css">
   <link rel="stylesheet" href="admin.css">
+  <link rel="stylesheet" href="ketua.css">
   <base target="_blank">
 </head>
 <body>
@@ -655,7 +656,36 @@
     </div>
   </div>
 </div>
-
+<<!-- ===== KETUA EKSKUL DASHBOARD ===== -->
+<div id="ketuaScreen" style="display:none;">
+  <div class="ketua-dashboard">
+    <div class="ketua-header">
+      <div class="ketua-badge">Ketua Ekskul</div>
+      <div class="ketua-title" id="ketuaEkskulName">-</div>
+      <div class="ketua-subtitle">SMK Diponegoro Tumpang</div>
+    </div>
+    
+    <div class="ketua-actions">
+      <button class="ketua-card" onclick="showKetuaAbsen()">
+        <div class="ketua-card-icon">📋</div>
+        <div class="ketua-card-body">
+          <div class="ketua-card-label">Absen Siswa</div>
+          <div class="ketua-card-desc">Catat kehadiran anggota ekskul</div>
+        </div>
+        <div class="ketua-card-arrow">›</div>
+      </button>
+      
+      <button class="ketua-card logout" onclick="doLogout()">
+        <div class="ketua-card-icon">🚪</div>
+        <div class="ketua-card-body">
+          <div class="ketua-card-label">Keluar</div>
+          <div class="ketua-card-desc">Kembali ke halaman login</div>
+        </div>
+        <div class="ketua-card-arrow">›</div>
+      </button>
+    </div>
+  </div>
+</div>
 <!-- ===== LATE RECORD SCREEN ===== -->
 <div id="lateRecordScreen" style="display:none;">
   <div class="app-header">
