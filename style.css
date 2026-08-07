@@ -436,7 +436,7 @@ html, body {
   background: rgba(10, 14, 26, 0.85);
   backdrop-filter: blur(8px);
   display: none;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: center;
   z-index: 300;
   padding: 16px;
@@ -454,7 +454,8 @@ html, body {
   flex-direction: column;
   overflow: hidden;
   max-height: 70dvh;
-  animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: slideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* changed from slideUp */
+  margin-top: 12px; /* breathing room below status bar */
 }
 
 .search-header {
@@ -1787,4 +1788,8 @@ html, body {
   color: var(--text-secondary);
   font-size: 15px;
   font-weight: 500;
+}
+@keyframes slideDown {
+  from { transform: translateY(-30px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }
