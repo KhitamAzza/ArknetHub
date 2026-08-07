@@ -317,7 +317,7 @@
 <!-- MAIN -->
 <div id="mainApp">
   <div class="app-header">
-  <button class="icon-btn" onclick="backToAbsenMenu()" title="Kembali">◀</button>
+  <button class="icon-btn" onclick="safeBackToAbsenMenu()" title="Kembali">◀</button>
   <div class="operator-info" style="flex:1; margin-left:12px;">
     <div class="operator-name" id="operatorName">-</div>
     <div class="operator-ekstra" id="operatorEkstra">-</div>
@@ -575,7 +575,7 @@
 <div id="faceScanScreen" style="display:none;">
   <!-- Header -->
   <div class="face-scan-header">
-    <button class="icon-btn" onclick="backFromFaceScan()" title="Kembali">◀</button>
+    <button class="icon-btn" onclick="safeBackFromFaceScan()" title="Kembali">◀</button>
     <div class="face-scan-title">📷 Face ID Absensi</div>
     <div style="width:40px;"></div>
   </div>
@@ -729,6 +729,31 @@
     <div class="modal-footer">
       <button class="btn-secondary" onclick="closeLateConfirm()">Batal</button>
       <button class="btn-primary" onclick="submitLateRecord()">Kirim</button>
+    </div>
+  </div>
+</div>
+<!-- BACK BLOCK MODAL -->
+<div id="backBlockModal" class="modal-overlay">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title">⚠️ Data Belum Tersimpan</div>
+    </div>
+    <div class="modal-body" style="text-align:center;">
+      <div style="font-size:48px;margin-bottom:12px;">📝</div>
+      <div style="font-size:15px;font-weight:600;margin-bottom:8px;color:var(--text);">
+        Ada <span id="backBlockCount">0</span> siswa yang belum dikirim
+      </div>
+      <div style="font-size:13px;color:var(--text-secondary);">
+        Jika keluar sekarang, data absensi akan hilang.
+      </div>
+    </div>
+    <div class="modal-footer" style="flex-direction:column;gap:8px;">
+      <button class="btn-primary" onclick="dismissBackBlock()" style="width:100%;">
+        Lanjutkan Absensi
+      </button>
+      <button class="btn-secondary" onclick="confirmBackBlock()" style="width:100%;background:transparent;color:var(--red);border:1px solid var(--red);">
+        Tinggalkan & Hapus Data
+      </button>
     </div>
   </div>
 </div>
