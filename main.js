@@ -84,7 +84,7 @@ function hideAllScreens() {
     "adminScreen", "helperScreen", "overseerScreen",
     "fixerScreen", "configScreen", "lateRecordScreen",
     "faceScanScreen", "danaHistoryScreen", "syaratScreen",
-    "daftarScreen", "searchOverlay"
+    "daftarScreen", "searchOverlay", "ketuaScreen"   // ← ADDED
   ];
   ids.forEach(id => {
     const el = document.getElementById(id);
@@ -93,12 +93,13 @@ function hideAllScreens() {
   if (summaryModal) summaryModal.classList.remove("visible");
   closeSearch();
 }
+
 // ===== LOGIN / LOGOUT =====
 async function doLogin() {
   const rawPassword = passwordInput.value.trim();
   const password = rawPassword.toLowerCase();
 
-  // Teacher / Pembina / Admin login
+  // === 1. TEACHER / ADMIN / PEMBINA ===
   if (OPERATORS[password]) {
     const op = OPERATORS[password];
     currentOperator = op.name;
@@ -127,47 +128,61 @@ async function doLogin() {
     }
 
     loginError.style.display = "none";
-    
-    if (isMaster) {
-      showAdminScreen();
-    } else {
-      showDashboard();
-    }
+    if (isMaster) showAdminScreen();
+    else showDashboard();
     updateRegBadge();
     return;
   }
 
-  // Panitia / Helper login
+  // === 2. FETCH CONFIG ONCE FOR HELPER & KETUA ===
+  let cfg = null;
   try {
     showLoading(true);
     const res = await fetch(API_URL + "?action=getConfig");
-    const cfg = await res.json();
+    cfg = await res.json();
     showLoading(false);
+  } catch (e) {
+    showLoading(false);
+    console.error("Config fetch failed", e);
+  }
 
-    // FIX: case-insensitive comparison
+  if (cfg && cfg.status === "ok") {
+
+    // === 2a. HELPER / PANITIA ===
     const cfgPassword = String(cfg.helperPassword || "").trim();
     const cfgEnable = String(cfg.helperEnable).toUpperCase() === "TRUE" || cfg.helperEnable === true;
-
-    if (cfg.status === "ok" && cfgEnable && rawPassword === cfgPassword) {
+    if (cfgEnable && rawPassword === cfgPassword) {
       isHelper = true;
       currentOperator = "Panitia";
       currentEkstra = "MASTER";
       isMaster = true;
-
       hideAllScreens();
       const el = document.getElementById("helperScreen");
       if (el) el.style.display = "flex";
       return;
     }
-  } catch (e) {
-    showLoading(false);
-    console.error("Helper login check failed", e);
+
+    // === 2b. KETUA EKSKUL ===
+    if (cfg.ketuaMap && typeof cfg.ketuaMap === 'object') {
+      const ekstra = cfg.ketuaMap[password]; // password already lowercased
+      if (ekstra) {
+        isHelper = false;
+        isMaster = false;
+        currentOperator = "Ketua " + ekstra;
+        currentEkstra = ekstra;
+        loginError.style.display = "none";
+        showKetuaDashboard();
+        return;
+      }
+    }
   }
 
+  // === 3. ALL FAILED ===
   loginError.style.display = "block";
   passwordInput.value = "";
   passwordInput.focus();
 }
+
 // ===== NAVIGATION =====
 function showDashboard() {
   if (dashboardScreen) dashboardScreen.style.display = "flex";
@@ -194,20 +209,20 @@ function backToAdmin() {
   showAdminScreen();
 }
 
-function backToDashboard() {
-  mainApp.style.display = "none";
-  absenMenuScreen.style.display = "none";
-  registrationScreen.style.display = "none";
-  listScreen.style.display = "none";
-  if (isMaster) {
-    showAdminScreen();
-  } else if (isHelper) {
-    showHelperScreen();
-  } else {
-    showDashboard();
-  }
-  updateRegBadge();
-}
+// function backToDashboard() {
+//   mainApp.style.display = "none";
+//   absenMenuScreen.style.display = "none";
+//   registrationScreen.style.display = "none";
+//   listScreen.style.display = "none";
+//   if (isMaster) {
+//     showAdminScreen();
+//   } else if (isHelper) {
+//     showHelperScreen();
+//   } else {
+//     showDashboard();
+//   }
+//   updateRegBadge();
+// }
 
 function backToAbsenMenu() {
   mainApp.style.display = "none";
@@ -218,6 +233,8 @@ function backToAbsenMenu() {
     showHelperScreen();
   } else if (isMaster) {
     showAdminScreen();
+  } else if (currentOperator && currentOperator.startsWith("Ketua ")) {
+    showKetuaDashboard();
   } else {
     absenMenuScreen.style.display = "flex";
   }
@@ -330,6 +347,23 @@ async function loadBundle(force = false) {
 function clearBundle() {
   appBundle = null;
 }
+
+function showKetuaDashboard() {
+  hideAllScreens();
+  const el = document.getElementById("ketuaScreen");
+  if (el) {
+    el.style.display = "flex";
+    const nameEl = document.getElementById("ketuaEkskulName");
+    if (nameEl) nameEl.textContent = currentEkstra;
+  }
+}
+
+function showKetuaAbsen() {
+  currentMode = 'REEL';
+  hideAllScreens();
+  const el = document.getElementById("absenMenuScreen");
+  if (el) el.style.display = "flex";
+}
 // ===== NAVIGATION =====
 function showDashboard() {
   hideAllScreens();
@@ -352,28 +386,28 @@ function showHelperScreen() {
   if (el) el.style.display = "flex";
 }
 
-function backToDashboard() {
-  if (isHelper) {
-    showHelperScreen();
-  } else if (isMaster) {
-    showAdminScreen();
-  } else {
-    showDashboard();
-  }
-  updateRegBadge();
-}
+// function backToDashboard() {
+//   if (isHelper) {
+//     showHelperScreen();
+//   } else if (isMaster) {
+//     showAdminScreen();
+//   } else {
+//     showDashboard();
+//   }
+//   updateRegBadge();
+// }
 
-function backToAbsenMenu() {
-  hideAllScreens();
-  if (isHelper) {
-    showHelperScreen();
-  } else if (isMaster) {
-    showAdminScreen();
-  } else {
-    if (absenMenuScreen) absenMenuScreen.style.display = "flex";
-  }
-  currentMode = null;
-}
+// function backToAbsenMenu() {
+//   hideAllScreens();
+//   if (isHelper) {
+//     showHelperScreen();
+//   } else if (isMaster) {
+//     showAdminScreen();
+//   } else {
+//     if (absenMenuScreen) absenMenuScreen.style.display = "flex";
+//   }
+//   currentMode = null;
+// }
 
 function backToAdmin() {
   showAdminScreen();
@@ -395,6 +429,10 @@ function backToDashboard() {
   listScreen.style.display = "none";
   if (isHelper) {
     showHelperScreen();
+  } else if (isMaster) {
+    showAdminScreen();
+  } else if (currentOperator && currentOperator.startsWith("Ketua ")) {
+    showKetuaDashboard();
   } else {
     showDashboard();
   }
@@ -408,18 +446,18 @@ function showReelAttendance() {
   loadStudents();
 }
 
-function backToAbsenMenu() {
-  mainApp.style.display = "none";
-  listScreen.style.display = "none";
-  summaryModal.classList.remove("visible");
-  closeSearch();
-  if (isHelper) {
-    showHelperScreen();
-  } else {
-    absenMenuScreen.style.display = "flex";
-  }
-  currentMode = null;
-}
+// function backToAbsenMenu() {
+//   mainApp.style.display = "none";
+//   listScreen.style.display = "none";
+//   summaryModal.classList.remove("visible");
+//   closeSearch();
+//   if (isHelper) {
+//     showHelperScreen();
+//   } else {
+//     absenMenuScreen.style.display = "flex";
+//   }
+//   currentMode = null;
+// }
 
 // AFTER
 function showFaceID() {
