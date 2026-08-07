@@ -331,12 +331,14 @@ async function submitAttendance() {
     if (data.status === "ok") {
       showStatus(`✓ ${data.processed} data terkirim`, "ok");
       loadStudents();
+      deactivateBackTrap();   // ← ADD HERE (only on success)
     } else {
       showStatus(data.message || "Gagal mengirim", "error");
     }
   } catch (err) {
     console.error(err);
     showStatus("Error koneksi: " + err.message, "error");
+    // NO deactivateBackTrap() here — keep guarding the unsent data
   }
 
   isSubmitting = false;
