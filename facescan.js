@@ -23,6 +23,9 @@ const FACE_THRESHOLD = 0.6;
 const CHUNK_SIZE = 20;
 const FACE_MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
 const EXCLUDE_CAM_TERMS = ['wide', 'ultra', 'tele', 'macro', 'depth', '0.5x', '2x', '3x'];
+const CONFIRM_FRAMES = 3;      // Need 3 consecutive good matches
+const MIN_CONFIDENCE = 75;     // 75% confidence required to even start counting
+let facePendingConfirm = new Map(); // nama → {count, data}
 
 // ===== DOM REFS (lazy init) =====
 function getFaceRefs() {
@@ -440,20 +443,21 @@ function startFaceRecognition() {
 
     const detections = await faceapi.detectAllFaces(
       video,
-      new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.5 })
+      new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.6 })
     ).withFaceLandmarks().withFaceDescriptors();
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const now = Date.now();
+    const confirmedThisFrame = new Set();
 
     if (detections.length === 0) {
       ctx.fillStyle = "rgba(100, 116, 139, 0.7)";
       ctx.font = "bold 16px sans-serif";
       ctx.textAlign = "center";
       ctx.fillText("👤 Tidak ada wajah terdeteksi", canvas.width / 2, canvas.height / 2);
+      facePendingConfirm.clear();
       return;
     }
-
-    const now = Date.now();
 
     for (const det of detections) {
       const box = det.detection.box;
@@ -470,45 +474,57 @@ function startFaceRecognition() {
         }
       }
 
-      let label, boxColor, textColor, status;
+      let label, boxColor, textColor;
 
       if (faceDescriptors.length === 0) {
         label = "📭 Database kosong";
         boxColor = "#f59e0b";
         textColor = "#fbbf24";
-        status = "empty";
       } else if (bestMatch && bestDist < FACE_THRESHOLD) {
-        const confidence = ((1 - bestDist) * 100).toFixed(0);
+        const confidence = ((1 - bestDist) * 100);
         const nama = bestMatch.nama;
+        confirmedThisFrame.add(nama);
 
         if (faceAlreadySubmitted.has(nama)) {
           label = "✅ " + nama + " — Sudah Absen";
-          boxColor = "#10b981";   // green
+          boxColor = "#10b981";
           textColor = "#86efac";
-          status = "submitted";
         } else if (faceScanned.has(nama)) {
           label = "🟠 " + nama + " — Sudah Scan";
-          boxColor = "#f59e0b";   // orange
+          boxColor = "#f59e0b";
           textColor = "#fcd34d";
-          status = "scanned";
+        } else if (confidence < MIN_CONFIDENCE) {
+          label = "🟡 " + nama + " (" + Math.floor(confidence) + "%)";
+          boxColor = "#f59e0b";
+          textColor = "#fcd34d";
+          facePendingConfirm.delete(nama);
         } else {
-          label = "🔵 " + nama + " (" + confidence + "%)";
-          boxColor = "#3b82f6";   // blue
-          textColor = "#93c5fd";
-          status = "new";
+          const pending = facePendingConfirm.get(nama);
+          let count = 1;
+          if (pending) count = pending.count + 1;
+          facePendingConfirm.set(nama, { count, data: bestMatch });
 
-          // Debounce: only add if not seen in last 3 seconds
-          const lastSeen = faceLastDetected.get(nama);
-          if (!lastSeen || (now - lastSeen > FACE_DEBOUNCE_MS)) {
-            faceLastDetected.set(nama, now);
-            addFaceScan(bestMatch);
+          if (count < CONFIRM_FRAMES) {
+            label = "⏳ " + nama + " (" + count + "/" + CONFIRM_FRAMES + ")";
+            boxColor = "#f59e0b";
+            textColor = "#fcd34d";
+          } else {
+            label = "🔵 " + nama + " ✓";
+            boxColor = "#3b82f6";
+            textColor = "#93c5fd";
+
+            const lastSeen = faceLastDetected.get(nama);
+            if (!lastSeen || (now - lastSeen > FACE_DEBOUNCE_MS)) {
+              faceLastDetected.set(nama, now);
+              addFaceScan(bestMatch);
+            }
+            facePendingConfirm.delete(nama);
           }
         }
       } else {
         label = "❌ Tidak Dikenal";
-        boxColor = "#ef4444";     // red
+        boxColor = "#ef4444";
         textColor = "#fca5a5";
-        status = "unknown";
       }
 
       // Draw box
@@ -527,6 +543,13 @@ function startFaceRecognition() {
       ctx.fillStyle = textColor;
       ctx.textAlign = "left";
       ctx.fillText(label, box.x + padding, box.y - 10);
+    }
+
+    // Clear pending for faces that disappeared this frame
+    for (const [nama] of facePendingConfirm) {
+      if (!confirmedThisFrame.has(nama)) {
+        facePendingConfirm.delete(nama);
+      }
     }
   }, 500);
 }
