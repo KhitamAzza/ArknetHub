@@ -1,3 +1,4 @@
+let listReturnTarget = "mainApp"; // "mainApp" | "faceScanScreen"
 // ===== REEL FILTER =====
 function filterForReel(students) {
   if (!currentPeriod) return students;
@@ -17,6 +18,7 @@ function getMarkLabel(student) {
 
 // ===== LIST VIEW =====
 function showList() {
+  listReturnTarget = "mainApp";
   const listEl = document.getElementById("studentList");
   listEl.innerHTML = "";
 
@@ -55,5 +57,10 @@ function showList() {
 
 function hideList() {
   listScreen.style.display = "none";
-  mainApp.style.display = "flex";
+  if (listReturnTarget === "faceScanScreen") {
+    mainApp.style.display = "none"; // keep reel hidden
+    // faceScanScreen stays flex underneath
+  } else {
+    mainApp.style.display = "flex";
+  }
 }
