@@ -19,12 +19,12 @@ let faceLocalStorageKey = "";
 let faceLastDetected = new Map(); // nama → timestamp (debounce dupes)
 let isSendingChunk = false;
 const FACE_DEBOUNCE_MS = 3000;
-const FACE_THRESHOLD = 0.6;
+// const FACE_THRESHOLD = 0.6;
+let faceThreshold = 0.6;   // mutable, will be overwritten by Config sheet
 const CHUNK_SIZE = 20;
 const FACE_MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
 const EXCLUDE_CAM_TERMS = ['wide', 'ultra', 'tele', 'macro', 'depth', '0.5x', '2x', '3x'];
 const CONFIRM_FRAMES = 3;      // Need 3 consecutive good matches
-const MIN_CONFIDENCE = 75;     // 75% confidence required to even start counting
 let facePendingConfirm = new Map(); // nama → {count, data}
 
 // ===== DOM REFS (lazy init) =====
@@ -113,7 +113,7 @@ async function initFaceScan() {
     }
   }
 
-  // 2. Load bundle WITHOUT face descriptors (small & fast)
+  // 2. Load bundle (roster + period, no face descriptors)
   showFaceLoading("Memuat data siswa...");
   try {
     const bundle = await loadBundle();
@@ -122,29 +122,40 @@ async function initFaceScan() {
     currentPeriod = bundle.period;
     totalStudents = bundle.students || [];
 
-      sheetStatus.clear();
-  totalStudents.forEach(s => { if (s.status) sheetStatus.set(s.nama, s.status); });
+    sheetStatus.clear();
+    totalStudents.forEach(s => {
+      if (s.status) sheetStatus.set(s.nama, s.status);
+    });
 
-  // FIX: derive "already submitted" from the actual cell + current period
-  // (same logic as reel.js updateStats())
-  faceAlreadySubmitted.clear();
-  totalStudents.forEach(s => {
-    const st = (sheetStatus.get(s.nama) || "").trim();
-    if (!st) return;
+    faceAlreadySubmitted.clear();
+    totalStudents.forEach(s => {
+      const st = (sheetStatus.get(s.nama) || "").trim();
+      if (!st) return;
 
-    if (currentPeriod?.isPagi && ["PAGI", "HADIR", "TERLAMBAT"].includes(st)) {
-      faceAlreadySubmitted.add(s.nama);
-    } else if (currentPeriod?.isEkstra && ["HADIR", "TERLAMBAT"].includes(st)) {
-      faceAlreadySubmitted.add(s.nama);
-    }
-  });
-  
+      if (currentPeriod?.isPagi && ["PAGI", "HADIR", "TERLAMBAT"].includes(st)) {
+        faceAlreadySubmitted.add(s.nama);
+      } else if (currentPeriod?.isEkstra && ["HADIR", "TERLAMBAT"].includes(st)) {
+        faceAlreadySubmitted.add(s.nama);
+      }
+    });
   } catch (err) {
     showFaceLoadingError("Gagal memuat data: " + err.message);
     return;
   }
 
-  // 3. Load face descriptors SEPARATELY (only for face scan)
+  // 2.5. Respect threshold from Config sheet
+  try {
+    const cfgRes = await fetch(API_URL + "?action=getConfig");
+    const cfg = await cfgRes.json();
+    if (cfg.status === "ok" && typeof cfg.threshold === "number") {
+      faceThreshold = cfg.threshold;
+      console.log("Face threshold set from config:", faceThreshold);
+    }
+  } catch (e) {
+    console.warn("Could not load config threshold, using default:", faceThreshold);
+  }
+
+  // 3. Load face descriptors separately
   showFaceLoading("Memuat data wajah...");
   try {
     await loadFaceDatabase();
@@ -153,12 +164,12 @@ async function initFaceScan() {
     return;
   }
 
-  // 4. Restore session from previous crash/refresh
+  // 4. Restore session from crash/refresh
   restoreFaceSession();
-  faceUnsentQueue = Array.from(faceScanned.values()); // treat all as unsent
+  faceUnsentQueue = Array.from(faceScanned.values());
   faceSyncedNames.clear();
 
-  // 5. If there are pending scans from before, auto-resume sending
+  // 5. Auto-resume sending pending scans
   if (faceUnsentQueue.length > 0) {
     submitFaceChunk();
   }
@@ -169,7 +180,6 @@ async function initFaceScan() {
   updateFaceStats();
   renderFaceScannedList();
 }
-
 // ===== LOAD FACE DATABASE =====
 async function loadFaceDatabase() {
   const isMaster = currentEkstra === "MASTER";
@@ -480,25 +490,25 @@ function startFaceRecognition() {
         label = "📭 Database kosong";
         boxColor = "#f59e0b";
         textColor = "#fbbf24";
-      } else if (bestMatch && bestDist < FACE_THRESHOLD) {
+      } else if (bestMatch && bestDist < faceThreshold) {
         const confidence = ((1 - bestDist) * 100);
         const nama = bestMatch.nama;
         confirmedThisFrame.add(nama);
 
+               // ── ALREADY SUBMITTED ──
         if (faceAlreadySubmitted.has(nama)) {
           label = "✅ " + nama + " — Sudah Absen";
           boxColor = "#10b981";
           textColor = "#86efac";
-        } else if (faceScanned.has(nama)) {
+        }
+        // ── ALREADY SCANNED THIS SESSION ──
+        else if (faceScanned.has(nama)) {
           label = "🟠 " + nama + " — Sudah Scan";
           boxColor = "#f59e0b";
           textColor = "#fcd34d";
-        } else if (confidence < MIN_CONFIDENCE) {
-          label = "🟡 " + nama + " (" + Math.floor(confidence) + "%)";
-          boxColor = "#f59e0b";
-          textColor = "#fcd34d";
-          facePendingConfirm.delete(nama);
-        } else {
+        }
+        // ── BUILDING CONFIDENCE (3-frame lock) ──
+        else {
           const pending = facePendingConfirm.get(nama);
           let count = 1;
           if (pending) count = pending.count + 1;
@@ -509,10 +519,11 @@ function startFaceRecognition() {
             boxColor = "#f59e0b";
             textColor = "#fcd34d";
           } else {
+            // ── LOCKED IN ──
             label = "🔵 " + nama + " ✓";
             boxColor = "#3b82f6";
             textColor = "#93c5fd";
-
+            
             const lastSeen = faceLastDetected.get(nama);
             if (!lastSeen || (now - lastSeen > FACE_DEBOUNCE_MS)) {
               faceLastDetected.set(nama, now);
