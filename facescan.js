@@ -26,6 +26,7 @@ const FACE_MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model'
 const EXCLUDE_CAM_TERMS = ['wide', 'ultra', 'tele', 'macro', 'depth', '0.5x', '2x', '3x'];
 const CONFIRM_FRAMES = 3;      // Need 3 consecutive good matches
 let facePendingConfirm = new Map(); // nama → {count, data}
+let verifyMode = 'list'; // 'list' | 'photo'
 
 // ===== DOM REFS (lazy init) =====
 function getFaceRefs() {
@@ -179,6 +180,7 @@ async function initFaceScan() {
   await startFaceCamera();
   updateFaceStats();
   renderFaceScannedList();
+  updateVerifyPanel();   // ← DESKTOP PANEL: initial render
 }
 // ===== LOAD FACE DATABASE =====
 async function loadFaceDatabase() {
@@ -321,6 +323,7 @@ async function submitFaceChunk() {
       faceUnsentQueue.splice(0, chunk.length);
       chunk.forEach(s => faceSyncedNames.add(s.nama));
       clearBundle();
+      updateVerifyPanel();   // ← DESKTOP PANEL: sync status updated
 
       if (faceUnsentQueue.length >= CHUNK_SIZE) {
         isSendingChunk = false;
@@ -605,6 +608,7 @@ function addFaceScan(student) {
   saveFaceSession();
   updateFaceStats();
   renderFaceScannedList();
+   updateVerifyPanel(); 
 
   // Auto-send when queue hits threshold
   if (faceUnsentQueue.length >= CHUNK_SIZE) {
@@ -686,6 +690,7 @@ function removeFaceScan(nama) {
   saveFaceSession();
   updateFaceStats();
   renderFaceScannedList();
+  updateVerifyPanel();
 }
 // ===== SUBMIT =====
 async function submitFaceScans() {
@@ -717,6 +722,7 @@ async function submitFaceScans() {
   faceSyncedNames.clear();
   updateFaceStats();
   renderFaceScannedList();
+  updateVerifyPanel(); 
   await loadTodaySubmitted();
   updateFaceStats();
 
@@ -801,6 +807,91 @@ function showFaceScanList() {
   });
 
   screen.style.display = "flex";
+}
+// ===== DESKTOP VERIFICATION PANEL =====
+function setVerifyMode(mode) {
+  verifyMode = mode;
+  document.getElementById('verifyToggleList')?.classList.toggle('active', mode === 'list');
+  document.getElementById('verifyTogglePhoto')?.classList.toggle('active', mode === 'photo');
+  document.getElementById('verifyContentList') && (document.getElementById('verifyContentList').style.display = mode === 'list' ? 'block' : 'none');
+  document.getElementById('verifyContentPhoto') && (document.getElementById('verifyContentPhoto').style.display = mode === 'photo' ? 'block' : 'none');
+  updateVerifyPanel();
+}
+
+function updateVerifyPanel() {
+  const panel = document.getElementById('verifyPanel');
+  if (!panel || getComputedStyle(panel).display === 'none') return;
+  verifyMode === 'list' ? renderVerifyList() : renderVerifyPhoto();
+}
+
+function renderVerifyList() {
+  const container = document.getElementById('verifyListLarge');
+  if (!container) return;
+
+  const scans = Array.from(faceScanned.values()).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+  if (scans.length === 0) {
+    container.innerHTML = `<div class="verify-empty"><div class="verify-empty-icon">📭</div><div>Belum ada siswa terdeteksi</div></div>`;
+    return;
+  }
+
+  container.innerHTML = scans.map(s => {
+    const isSynced = faceSyncedNames.has(s.nama);
+    const db = totalStudents.find(st => st.nama === s.nama);
+    const foto = db?.foto || '';
+    return `
+      <div class="verify-item">
+        ${foto 
+          ? `<img class="verify-item-photo" src="${foto}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"><div class="verify-item-photo-placeholder" style="display:none;">👤</div>`
+          : `<div class="verify-item-photo-placeholder">👤</div>`
+        }
+        <div class="verify-item-info">
+          <div class="verify-item-name">${escapeHtml(s.nama)}</div>
+          <div class="verify-item-meta">${escapeHtml(s.kelas)} • ${escapeHtml(s.ekstra || currentEkstra || '-')}</div>
+        </div>
+        <div class="verify-item-status">${isSynced ? '✓ Tersimpan' : '⏳ Menunggu'}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderVerifyPhoto() {
+  const emptyEl = document.getElementById('verifyPhotoEmpty');
+  const cardEl = document.getElementById('verifyPhotoCard');
+  const imgEl = document.getElementById('verifyPhotoImg');
+  const fallbackEl = document.getElementById('verifyPhotoFallback');
+  if (!emptyEl || !cardEl) return;
+
+  const scans = Array.from(faceScanned.values());
+  if (scans.length === 0) {
+    emptyEl.style.display = 'flex';
+    cardEl.style.display = 'none';
+    return;
+  }
+
+  const last = scans.reduce((a, b) => new Date(a.timestamp) > new Date(b.timestamp) ? a : b);
+  const db = totalStudents.find(st => st.nama === last.nama);
+  const foto = db?.foto || '';
+
+  emptyEl.style.display = 'none';
+  cardEl.style.display = 'flex';
+
+  if (imgEl) {
+    imgEl.style.display = 'block';
+    imgEl.src = foto;
+    imgEl.onerror = function() { this.style.display = 'none'; fallbackEl && (fallbackEl.style.display = 'flex'); };
+    imgEl.onload = function() { fallbackEl && (fallbackEl.style.display = 'none'); };
+  }
+
+  const nameEl = document.getElementById('verifyPhotoName');
+  const classEl = document.getElementById('verifyPhotoClass');
+  const ekstraEl = document.getElementById('verifyPhotoEkstra');
+  const statusEl = document.getElementById('verifyPhotoStatus');
+
+  if (nameEl) nameEl.textContent = last.nama;
+  if (classEl) classEl.textContent = last.kelas;
+  if (ekstraEl) ekstraEl.textContent = last.ekstra || currentEkstra || '-';
+  if (statusEl) statusEl.textContent = last.status;
 }
 
 // ===== UTILS =====
