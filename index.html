@@ -575,10 +575,10 @@
 <div id="faceScanScreen" style="display:none;">
   <!-- Header -->
   <div class="face-scan-header">
-  <button class="icon-btn" onclick="safeBackFromFaceScan()" title="Kembali">◀</button>
-  <div class="face-scan-title">📷 Face ID Absensi</div>
-  <button class="icon-btn" onclick="showFaceScanList()" title="Daftar">📋</button>
-</div>
+    <button class="icon-btn" onclick="safeBackFromFaceScan()" title="Kembali">◀</button>
+    <div class="face-scan-title">📷 Face ID Absensi</div>
+    <button class="icon-btn" onclick="showFaceScanList()" title="Daftar">📋</button>
+  </div>
 
   <!-- Stats Bar -->
   <div class="face-stats-bar" id="faceStatsBar">
@@ -630,6 +630,43 @@
     <div class="spinner"></div>
     <div class="face-loading-text" id="faceLoadingText">Memuat...</div>
   </div>
+
+  <!-- DESKTOP VERIFICATION PANEL (student-facing) — MOVED OUTSIDE HEADER -->
+  <div class="verify-panel" id="verifyPanel">
+    <div class="verify-toggle-wrap">
+      <button class="verify-toggle active" id="verifyToggleList" onclick="setVerifyMode('list')">📋 List</button>
+      <button class="verify-toggle" id="verifyTogglePhoto" onclick="setVerifyMode('photo')">🖼️ Photo</button>
+    </div>
+    
+    <div class="verify-content" id="verifyContentList">
+      <div class="verify-panel-title">✅ Siswa Terdeteksi</div>
+      <div class="verify-list-large" id="verifyListLarge">
+        <div class="verify-empty"><div class="verify-empty-icon">📭</div><div>Belum ada siswa terdeteksi</div></div>
+      </div>
+    </div>
+    
+    <div class="verify-content" id="verifyContentPhoto" style="display:none;">
+      <div class="verify-panel-title">✅ Siswa Terdeteksi</div>
+      <div class="verify-photo-stage" id="verifyPhotoStage">
+        <div class="verify-photo-empty" id="verifyPhotoEmpty">
+          <div class="verify-empty-icon">👤</div>
+          <div class="verify-empty-text">Arahkan wajah ke kamera</div>
+        </div>
+        <div class="verify-photo-card" id="verifyPhotoCard" style="display:none;">
+          <div class="verify-photo-img-wrap">
+            <img class="verify-photo-img" id="verifyPhotoImg" src="" alt="">
+            <div class="verify-photo-fallback" id="verifyPhotoFallback">👤</div>
+          </div>
+          <div class="verify-photo-info">
+            <div class="verify-photo-name" id="verifyPhotoName">-</div>
+            <div class="verify-photo-class" id="verifyPhotoClass">-</div>
+            <div class="verify-photo-ekstra" id="verifyPhotoEkstra">-</div>
+            <div class="verify-photo-status" id="verifyPhotoStatus">HADIR</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- ===== HELPER / PANITIA DASHBOARD ===== -->
@@ -656,7 +693,7 @@
     </div>
   </div>
 </div>
-<<!-- ===== KETUA EKSKUL DASHBOARD ===== -->
+<!-- ===== KETUA EKSKUL DASHBOARD ===== -->
 <div id="ketuaScreen" style="display:none;">
   <div class="ketua-dashboard">
     <div class="ketua-header">
