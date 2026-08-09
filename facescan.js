@@ -288,6 +288,10 @@ function clearFaceSession() {
 async function submitFaceChunk() {
   if (isSendingChunk || faceUnsentQueue.length === 0) return;
   isSendingChunk = true;
+  showLoading(true);
+
+  const btn = document.getElementById("faceBtnSimpan");
+  if (btn) btn.disabled = true;
 
   const chunk = faceUnsentQueue.slice(0, CHUNK_SIZE);
   const today = getJakartaDateString();
@@ -314,16 +318,13 @@ async function submitFaceChunk() {
     const data = await res.json();
 
     if (data.status === "ok") {
-      // Remove sent items from queue
       faceUnsentQueue.splice(0, chunk.length);
-      // Mark as synced
       chunk.forEach(s => faceSyncedNames.add(s.nama));
       clearBundle();
 
-      // If more queued, send next chunk immediately
       if (faceUnsentQueue.length >= CHUNK_SIZE) {
         isSendingChunk = false;
-        submitFaceChunk();
+        submitFaceChunk(); // next chunk, loading stays on
         return;
       }
     } else {
@@ -336,6 +337,8 @@ async function submitFaceChunk() {
   }
 
   isSendingChunk = false;
+  showLoading(false);
+  if (btn) btn.disabled = false;
   updateFaceStats();
   renderFaceScannedList();
 }
@@ -686,6 +689,9 @@ function removeFaceScan(nama) {
 }
 // ===== SUBMIT =====
 async function submitFaceScans() {
+  const btn = document.getElementById("faceBtnSimpan");
+  if (btn) btn.disabled = true;
+
   // 1. Flush any remaining queue first
   if (faceUnsentQueue.length > 0) {
     await submitFaceChunk();
@@ -694,11 +700,13 @@ async function submitFaceScans() {
   // 2. If queue still has items (failed), don't clear anything
   if (faceUnsentQueue.length > 0) {
     showStatus("Beberapa data gagal dikirim, coba lagi", "error");
+    if (btn) btn.disabled = false;
     return;
   }
 
   if (faceScanned.size === 0) {
     showStatus("Belum ada siswa yang discan", "error");
+    if (btn) btn.disabled = false;
     return;
   }
 
@@ -707,11 +715,12 @@ async function submitFaceScans() {
   faceScanned.clear();
   faceUnsentQueue = [];
   faceSyncedNames.clear();
-  deactivateBackTrap();
   updateFaceStats();
   renderFaceScannedList();
   await loadTodaySubmitted();
   updateFaceStats();
+
+  if (btn) btn.disabled = false;
 }
 
 function batalFaceScan() {
@@ -748,6 +757,50 @@ function showFaceLoadingError(msg) {
   if (refs.loadingText) {
     refs.loadingText.innerHTML = `<span style="color:var(--red);">❌ ${escapeHtml(msg)}</span><br><button class="btn-primary" style="margin-top:16px;" onclick="initFaceScan()">Coba Lagi</button>`;
   }
+}
+function showFaceScanList() {
+  listReturnTarget = "faceScanScreen";
+  const listEl = document.getElementById("studentList");
+  const screen = document.getElementById("listScreen");
+  if (!listEl || !screen) return;
+
+  listEl.innerHTML = "";
+
+  // Sort: not done first, then alphabetical
+  const sorted = [...totalStudents].sort((a, b) => {
+    const aDone = faceAlreadySubmitted.has(a.nama) || faceScanned.has(a.nama);
+    const bDone = faceAlreadySubmitted.has(b.nama) || faceScanned.has(b.nama);
+    if (aDone !== bDone) return aDone ? 1 : -1;
+    return a.nama.localeCompare(b.nama);
+  });
+
+  sorted.forEach(s => {
+    const isSubmitted = faceAlreadySubmitted.has(s.nama);
+    const isScanned = faceScanned.has(s.nama);
+    const isDone = isSubmitted || isScanned;
+
+    let displayStatus = "BELUM";
+    if (isSubmitted) {
+      displayStatus = sheetStatus.get(s.nama) || "HADIR";
+    } else if (isScanned) {
+      displayStatus = faceScanned.get(s.nama)?.status || "SCAN";
+    }
+
+    const item = document.createElement("div");
+    item.className = "list-item " + (isDone ? "hadir" : "belum");
+    item.innerHTML = `
+      <img class="list-item-photo" src="${s.foto || ""}" loading="lazy" onerror="this.style.display='none'">
+      <div class="list-item-info">
+        <div class="list-item-name">${s.nama}</div>
+        <div class="list-item-class">${s.kelas} • ${s.ekstra}</div>
+      </div>
+      <div class="list-item-status ${isDone ? "hadir" : "belum"}">${displayStatus}</div>
+    `;
+    // No onclick — Face Scan is read-only list, just close with ✕
+    listEl.appendChild(item);
+  });
+
+  screen.style.display = "flex";
 }
 
 // ===== UTILS =====
