@@ -1793,3 +1793,5 @@ html, body {
   from { transform: translateY(-30px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 }
+.list-item.scanned { border-left-color: var(--yellow); }
+.list-item-status.scanned { color: var(--yellow); background: rgba(245, 158, 11, 0.12); }
