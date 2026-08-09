@@ -227,6 +227,7 @@ function backToAbsenMenu() {
 }
 
 function showAdminAbsen() {
+  hideAllScreens();
   currentMode = 'REEL';
   isMaster = true;
   currentEkstra = "MASTER";
