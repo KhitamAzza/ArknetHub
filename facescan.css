@@ -89,7 +89,7 @@
   justify-content: center;
   background: #000;
   overflow: hidden;
-  min-height: 0;
+  min-height: 180px;
 }
 
 .face-camera-area video {
@@ -106,7 +106,44 @@
   width: 100%;
   height: 100%;
   z-index: 2;
+  object-fit: cover; /* 🔥 ADD THIS LINE to mirror camera cropping layout specs */
 }
+
+
+/* Status Ribbon — big banner above the camera showing scan state */
+.face-scan-ribbon {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 6;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 12px 16px;
+  text-align: center;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  line-height: 1.3;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.25);
+  transition: background-color 0.15s ease;
+}
+
+.face-scan-ribbon.visible { display: flex; }
+
+.face-scan-ribbon .ribbon-sub {
+  font-size: 14px;
+  font-weight: 700;
+  opacity: 0.96;
+}
+
+.face-scan-ribbon.state-scanning { background: #f59e0b; } /* yellow */
+.face-scan-ribbon.state-success  { background: #10b981; } /* green */
+.face-scan-ribbon.state-danger   { background: #ef4444; } /* red */
 
 /* Camera overlay hint */
 .face-camera-hint {
@@ -148,10 +185,11 @@
 
 .face-cam-switch:active { transform: scale(0.9); background: var(--border); }
 
-/* Scanned List */
+/* Scanned List — fixed height regardless of item count, so a long list
+   scrolls internally instead of growing and squeezing the camera area */
 .face-scanned-area {
   flex-shrink: 0;
-  max-height: 35vh;
+  max-height: 15vh; /* Change this from 35vh to 15vh */
   display: flex;
   flex-direction: column;
   background: var(--card);
