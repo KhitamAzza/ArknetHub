@@ -1810,19 +1810,27 @@ html, body {
   .face-scan-header,
   .face-stats-bar,
   .face-camera-area,
-  .face-scanned-area,
   .face-bottom-bar,
   #faceLoadingOverlay {
     width: 70%;
     max-width: none;
     flex-shrink: 0;
   }
+  
+
+  /* Redundant on desktop — the verify panel on the right already shows
+     detected students, so hide this mobile-only strip and let the
+     camera use the freed vertical space. */
+  .face-scanned-area {
+    display: none !important;
+  }
+
 
   .face-camera-area {
-    flex: 1;
-    min-height: 0;
-    max-height: none;
-    position: relative;
+    width: 70%;
+    flex: 1 !important;
+    height: 100% !important;
+    max-height: none !important;
   }
   
   .face-camera-area video,
@@ -1833,11 +1841,6 @@ html, body {
     height: 100%;
     object-fit: cover;
     border-radius: 16px;
-  }
-
-  .face-scanned-area {
-    max-height: 16vh;
-    min-height: 90px;
   }
 
   /* RIGHT SIDE — student-facing verify panel */
