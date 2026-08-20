@@ -1,8 +1,28 @@
 const API_URL = "https://script.google.com/macros/s/AKfycbxyS9_P4Ktcy5LQ27g1sHM_eJNiOdvAJxIosVKY3Rq4bjAwn9HZ9ho_zPN4A5nDZILXpw/exec";
 
+// ===== RESILIENT GET HELPER =====
+// Apps Script Web Apps redirect every GET to a one-time
+// script.googleusercontent.com/macros/echo?... URL to serve the JSON.
+// That redirect target 404s intermittently (a known Apps Script quirk),
+// which surfaces here as a JSON parse error. Retry a couple of times
+// with a short backoff before giving up. GET/read-only calls only —
+// never wrap POST/write calls in this, to avoid double-submitting data.
+async function fetchJsonWithRetry(url, retries = 2, delayMs = 700) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url, { cache: "no-store" });
+      return await res.json();
+    } catch (err) {
+      if (attempt === retries) throw err;
+      await new Promise(r => setTimeout(r, delayMs * (attempt + 1)));
+    }
+  }
+}
+
 const OPERATORS = {
   "azkiahasna": { name: "Chusnul Khitam Azza", ekstra: "MASTER", isMaster: true },
   "devkoord1": { name: "Hernanda", ekstra: "MASTER", isMaster: true },
+  "devkoord2": { name: "Masduki Zen", ekstra: "MASTER", isMaster: true },
   // "devtatib1": { name: "Syamsul Arif", ekstra: "MASTER", isMaster: true },
   // "devtatib2": { name: "Siti Munawaroh", ekstra: "MASTER", isMaster: true },
   "eksesport": { name: "Masduki Zen", ekstra: "E-Sport" },
@@ -138,8 +158,7 @@ async function doLogin() {
   let cfg = null;
   try {
     showLoading(true);
-    const res = await fetch(API_URL + "?action=getConfig");
-    cfg = await res.json();
+    cfg = await fetchJsonWithRetry(API_URL + "?action=getConfig");
     showLoading(false);
   } catch (e) {
     showLoading(false);
@@ -300,10 +319,9 @@ async function loadBundle(force = false) {
   if (!ekstraParam) return null;
 
   showLoading(true);
-  bundlePromise = fetch(
+  bundlePromise = fetchJsonWithRetry(
     API_URL + "?action=getBundle&ekstra=" + encodeURIComponent(ekstraParam) + "&date=" + encodeURIComponent(today)
   )
-    .then(r => r.json())
     .then(data => {
       if (data.status === "ok") {
         appBundle = data;
@@ -597,8 +615,7 @@ function showDaftarSiswa() {
   // Implemented in daftar.js
 }
 // Fetch config early to show/hide helper login hint
-fetch(API_URL + "?action=getConfig")
-  .then(r => r.json())
+fetchJsonWithRetry(API_URL + "?action=getConfig")
   .then(cfg => {
     if (cfg.status === "ok" && cfg.helperEnable) {
       const hint = document.getElementById("loginHelperHint");
