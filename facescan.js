@@ -34,6 +34,7 @@ function getFaceRefs() {
     screen: document.getElementById("faceScanScreen"),
     video: document.getElementById("faceVideo"),
     canvas: document.getElementById("faceCanvas"),
+    ribbon: document.getElementById("faceScanRibbon"),
     statsBar: document.getElementById("faceStatsBar"),
     scannedList: document.getElementById("faceScannedList"),
     emptyScanned: document.getElementById("faceEmptyScanned"),
@@ -146,8 +147,7 @@ async function initFaceScan() {
 
   // 2.5. Respect threshold from Config sheet
   try {
-    const cfgRes = await fetch(API_URL + "?action=getConfig");
-    const cfg = await cfgRes.json();
+    const cfg = await fetchJsonWithRetry(API_URL + "?action=getConfig");
     if (cfg.status === "ok" && typeof cfg.threshold === "number") {
       faceThreshold = cfg.threshold;
       console.log("Face threshold set from config:", faceThreshold);
@@ -187,8 +187,7 @@ async function loadFaceDatabase() {
   const isMaster = currentEkstra === "MASTER";
   const ekstraParam = isMaster ? "MASTER" : currentEkstra;
 
-  const res = await fetch(API_URL + "?action=getFaceDatabase&ekstra=" + encodeURIComponent(ekstraParam));
-  const data = await res.json();
+  const data = await fetchJsonWithRetry(API_URL + "?action=getFaceDatabase&ekstra=" + encodeURIComponent(ekstraParam));
 
   if (data.status !== "ok") {
     throw new Error(data.message || "Gagal memuat data wajah");
@@ -217,8 +216,7 @@ async function loadCurrentPeriod() {
   const ekstraParam = isMaster ? "MASTER" : currentEkstra;
   const today = getJakartaDateString();
 
-  const res = await fetch(API_URL + "?action=getStudentsByEkstra&ekstra=" + encodeURIComponent(ekstraParam) + "&date=" + encodeURIComponent(today));
-  const data = await res.json();
+  const data = await fetchJsonWithRetry(API_URL + "?action=getStudentsByEkstra&ekstra=" + encodeURIComponent(ekstraParam) + "&date=" + encodeURIComponent(today));
 
   if (data.status !== "ok") {
     throw new Error(data.message || "Gagal memuat periode");
@@ -243,8 +241,7 @@ async function loadCurrentPeriod() {
 // ===== LOAD TODAY'S SUBMITTED =====
 async function loadTodaySubmitted() {
   const today = getJakartaDateString();
-  const res = await fetch(API_URL + "?action=getLogAbsen&date=" + encodeURIComponent(today));
-  const data = await res.json();
+  const data = await fetchJsonWithRetry(API_URL + "?action=getLogAbsen&date=" + encodeURIComponent(today));
 
   faceAlreadySubmitted.clear();
   if (data.status === "ok" && data.data) {
@@ -436,12 +433,29 @@ function stopFaceCamera() {
     const ctx = refs.canvas.getContext("2d");
     ctx.clearRect(0, 0, refs.canvas.width, refs.canvas.height);
   }
+  hideFaceRibbon(refs);
 }
 
 function switchFaceCamera() {
   faceCameraFacing = faceCameraFacing === 'environment' ? 'user' : 'environment';
   stopFaceCamera();
   startFaceCamera();
+}
+
+// ===== SCAN STATUS RIBBON =====
+// Big banner above the camera showing current scan state (replaces the
+// small on-box label). Purely visual — does not affect scan logic.
+function setFaceRibbon(refs, stateClass, line1, line2) {
+  if (!refs.ribbon) return;
+  refs.ribbon.className = "face-scan-ribbon visible " + stateClass;
+  refs.ribbon.innerHTML = line2
+    ? escapeHtml(line1) + '<div class="ribbon-sub">' + escapeHtml(line2) + '</div>'
+    : escapeHtml(line1);
+}
+
+function hideFaceRibbon(refs) {
+  if (!refs.ribbon) return;
+  refs.ribbon.classList.remove("visible");
 }
 
 // ===== FACE RECOGNITION =====
@@ -451,31 +465,36 @@ function startFaceRecognition() {
   const canvas = refs.canvas;
   const ctx = canvas.getContext("2d");
 
-  canvas.width = video.videoWidth || 640;
-  canvas.height = video.videoHeight || 480;
-
   faceRecognitionInterval = setInterval(async () => {
     if (video.paused || video.ended || !faceScanScreenActive) return;
+
+    // Safety guard: Wait until the camera stream initializes its width/height
+    if (!video.videoWidth || !video.videoHeight) return;
+
+    // Define the dimensions and match the canvas overlay layout
+    const displaySize = { width: video.videoWidth, height: video.videoHeight };
+    faceapi.matchDimensions(canvas, displaySize);
 
     const detections = await faceapi.detectAllFaces(
       video,
       new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.6 })
     ).withFaceLandmarks().withFaceDescriptors();
 
+    // 🔥 FIX: Map face coordinate tracking matrices directly onto the canvas size
+    const resizedDetections = faceapi.resizeResults(detections, displaySize);
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const now = Date.now();
     const confirmedThisFrame = new Set();
 
-    if (detections.length === 0) {
-      ctx.fillStyle = "rgba(100, 116, 139, 0.7)";
-      ctx.font = "bold 16px sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("👤 Tidak ada wajah terdeteksi", canvas.width / 2, canvas.height / 2);
+    if (resizedDetections.length === 0) {
+      hideFaceRibbon(refs);
       facePendingConfirm.clear();
       return;
     }
 
-    for (const det of detections) {
+    // Loop through resized detections instead of the raw ones
+    for (const det of resizedDetections) {
       const box = det.detection.box;
       const liveDesc = Array.from(det.descriptor);
 
@@ -490,28 +509,26 @@ function startFaceRecognition() {
         }
       }
 
-      let label, boxColor, textColor;
+      let boxColor;
+      let reticleCount = null; // null = no countdown shown, just a full locked ring
 
       if (faceDescriptors.length === 0) {
-        label = "📭 Database kosong";
         boxColor = "#f59e0b";
-        textColor = "#fbbf24";
+        setFaceRibbon(refs, "state-scanning", "Database wajah kosong");
       } else if (bestMatch && bestDist < faceThreshold) {
         const confidence = ((1 - bestDist) * 100);
         const nama = bestMatch.nama;
         confirmedThisFrame.add(nama);
 
-               // ── ALREADY SUBMITTED ──
+        // ── ALREADY SUBMITTED ──
         if (faceAlreadySubmitted.has(nama)) {
-          label = "✅ " + nama + " — Sudah Absen";
           boxColor = "#10b981";
-          textColor = "#86efac";
+          setFaceRibbon(refs, "state-success", "Siswa sudah di scan", nama + " - " + bestMatch.kelas);
         }
         // ── ALREADY SCANNED THIS SESSION ──
         else if (faceScanned.has(nama)) {
-          label = "🟠 " + nama + " — Sudah Scan";
-          boxColor = "#f59e0b";
-          textColor = "#fcd34d";
+          boxColor = "#10b981";
+          setFaceRibbon(refs, "state-success", "Siswa sudah di scan", nama + " - " + bestMatch.kelas);
         }
         // ── BUILDING CONFIDENCE (3-frame lock) ──
         else {
@@ -521,15 +538,15 @@ function startFaceRecognition() {
           facePendingConfirm.set(nama, { count, data: bestMatch });
 
           if (count < CONFIRM_FRAMES) {
-            label = "⏳ " + nama + " (" + count + "/" + CONFIRM_FRAMES + ")";
             boxColor = "#f59e0b";
-            textColor = "#fcd34d";
+            reticleCount = count;
+            setFaceRibbon(refs, "state-scanning", "Tahan jangan bergerak", count + "/" + CONFIRM_FRAMES);
           } else {
             // ── LOCKED IN ──
-            label = "🔵 " + nama + " ✓";
             boxColor = "#3b82f6";
-            textColor = "#93c5fd";
-            
+            reticleCount = count;
+            setFaceRibbon(refs, "state-success", "Scan berhasil", nama + " - " + bestMatch.kelas);
+
             const lastSeen = faceLastDetected.get(nama);
             if (!lastSeen || (now - lastSeen > FACE_DEBOUNCE_MS)) {
               faceLastDetected.set(nama, now);
@@ -539,27 +556,12 @@ function startFaceRecognition() {
           }
         }
       } else {
-        label = "❌ Tidak Dikenal";
         boxColor = "#ef4444";
-        textColor = "#fca5a5";
+        setFaceRibbon(refs, "state-danger", "Wajah tidak dikenali");
       }
 
-      // Draw box
-      ctx.strokeStyle = boxColor;
-      ctx.lineWidth = 3;
-      ctx.strokeRect(box.x, box.y, box.width, box.height);
-
-      // Draw label background
-      ctx.font = "bold 15px sans-serif";
-      const textWidth = ctx.measureText(label).width;
-      const padding = 8;
-      ctx.fillStyle = "rgba(15, 23, 42, 0.9)";
-      ctx.fillRect(box.x, box.y - 32, textWidth + padding * 2, 28);
-
-      // Draw label text
-      ctx.fillStyle = textColor;
-      ctx.textAlign = "left";
-      ctx.fillText(label, box.x + padding, box.y - 10);
+      // Draw animated target-lock reticle aligned with the resized viewport coordinates
+      drawReticle(ctx, box, boxColor, now, { count: reticleCount, max: CONFIRM_FRAMES });
     }
 
     // Clear pending for faces that disappeared this frame
@@ -577,6 +579,65 @@ function euclideanDistance(a, b) {
     sum += (a[i] - b[i]) * (a[i] - b[i]);
   }
   return Math.sqrt(sum);
+}
+
+// ===== RETICLE (target-lock circle: sweep progress + countdown + pulsing glow) =====
+function drawReticle(ctx, box, color, now, opts = {}) {
+  const { x, y, width: w, height: h } = box;
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const radius = (Math.max(w, h) / 2) * 1.15;
+
+  const count = opts.count ?? null;          // null = no countdown (idle/locked states)
+  const max = opts.max || CONFIRM_FRAMES;
+  const progress = count !== null ? Math.min(count / max, 1) : 1; // full ring when not counting
+
+  // Pulse: breathing glow driven by a sine wave (period ~1.2s)
+  const pulse = (Math.sin((now / 600) * Math.PI) + 1) / 2; // 0..1
+  const glow = 6 + pulse * 12;   // 6..18 px blur
+  const alpha = 0.8 + pulse * 0.2; // 0.8..1.0
+
+  ctx.save();
+
+  // Outer ring — thin dashed guide, full 360°, distinct from inner sweep stroke
+  ctx.beginPath();
+  ctx.setLineDash([5, 5]);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = color;
+  ctx.globalAlpha = 0.5;
+  ctx.shadowBlur = 0;
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]); // reset dash so it doesn't leak into other draws
+
+  // Inner sweep — solid progress arc, starts at 12 o'clock, sweeps clockwise
+  ctx.beginPath();
+  ctx.lineWidth = 5;
+  ctx.lineCap = "round";
+  ctx.strokeStyle = color;
+  ctx.globalAlpha = alpha;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = glow;
+  const startAngle = -Math.PI / 2;
+  const endAngle = startAngle + Math.PI * 2 * progress;
+  ctx.arc(cx, cy, radius - 7, startAngle, endAngle);
+  ctx.stroke();
+
+  ctx.restore();
+
+  // Center countdown number (1, 2, 3...) while locking on
+  if (count !== null) {
+    ctx.save();
+    ctx.font = "bold 30px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 10;
+    ctx.globalAlpha = alpha;
+    ctx.fillText(String(count), cx, cy);
+    ctx.restore();
+  }
 }
 
 // ===== ADD SCAN =====
