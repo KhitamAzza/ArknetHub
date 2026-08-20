@@ -581,65 +581,182 @@ function euclideanDistance(a, b) {
   return Math.sqrt(sum);
 }
 
-// ===== RETICLE (target-lock circle: sweep progress + countdown + pulsing glow) =====
+// // ===== RETICLE (target-lock circle: sweep progress + countdown + pulsing glow) =====
+// function drawReticle(ctx, box, color, now, opts = {}) {
+//   const { x, y, width: w, height: h } = box;
+//   const cx = x + w / 2;
+//   const cy = y + h / 2;
+//   const radius = (Math.max(w, h) / 2) * 1.15;
+
+//   const count = opts.count ?? null;          // null = no countdown (idle/locked states)
+//   const max = opts.max || CONFIRM_FRAMES;
+//   const progress = count !== null ? Math.min(count / max, 1) : 1; // full ring when not counting
+
+//   // Pulse: breathing glow driven by a sine wave (period ~1.2s)
+//   const pulse = (Math.sin((now / 600) * Math.PI) + 1) / 2; // 0..1
+//   const glow = 6 + pulse * 12;   // 6..18 px blur
+//   const alpha = 0.8 + pulse * 0.2; // 0.8..1.0
+
+//   ctx.save();
+
+//   // Outer ring — thin dashed guide, full 360°, distinct from inner sweep stroke
+//   ctx.beginPath();
+//   ctx.setLineDash([5, 5]);
+//   ctx.lineWidth = 2;
+//   ctx.strokeStyle = color;
+//   ctx.globalAlpha = 0.5;
+//   ctx.shadowBlur = 0;
+//   ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+//   ctx.stroke();
+//   ctx.setLineDash([]); // reset dash so it doesn't leak into other draws
+
+//   // Inner sweep — solid progress arc, starts at 12 o'clock, sweeps clockwise
+//   ctx.beginPath();
+//   ctx.lineWidth = 5;
+//   ctx.lineCap = "round";
+//   ctx.strokeStyle = color;
+//   ctx.globalAlpha = alpha;
+//   ctx.shadowColor = color;
+//   ctx.shadowBlur = glow;
+//   const startAngle = -Math.PI / 2;
+//   const endAngle = startAngle + Math.PI * 2 * progress;
+//   ctx.arc(cx, cy, radius - 7, startAngle, endAngle);
+//   ctx.stroke();
+
+//   ctx.restore();
+
+//   // Center countdown number (1, 2, 3...) while locking on
+//   if (count !== null) {
+//     ctx.save();
+//     ctx.font = "bold 30px sans-serif";
+//     ctx.textAlign = "center";
+//     ctx.textBaseline = "middle";
+//     ctx.fillStyle = color;
+//     ctx.shadowColor = color;
+//     ctx.shadowBlur = 10;
+//     ctx.globalAlpha = alpha;
+//     ctx.fillText(String(count), cx, cy);
+//     ctx.restore();
+//   }
+// }
+// ===== RETICLE (crosshair: corner brackets + center cross + outside badge) =====
 function drawReticle(ctx, box, color, now, opts = {}) {
   const { x, y, width: w, height: h } = box;
   const cx = x + w / 2;
   const cy = y + h / 2;
-  const radius = (Math.max(w, h) / 2) * 1.15;
-
-  const count = opts.count ?? null;          // null = no countdown (idle/locked states)
+  const count = opts.count ?? null;
   const max = opts.max || CONFIRM_FRAMES;
-  const progress = count !== null ? Math.min(count / max, 1) : 1; // full ring when not counting
+  const progress = count !== null ? Math.min(count / max, 1) : 1;
 
-  // Pulse: breathing glow driven by a sine wave (period ~1.2s)
-  const pulse = (Math.sin((now / 600) * Math.PI) + 1) / 2; // 0..1
-  const glow = 6 + pulse * 12;   // 6..18 px blur
-  const alpha = 0.8 + pulse * 0.2; // 0.8..1.0
+  // Pulse animation for glow
+  const pulse = (Math.sin((now / 600) * Math.PI) + 1) / 2;
+  const glow = 10 + pulse * 14;
 
   ctx.save();
 
-  // Outer ring — thin dashed guide, full 360°, distinct from inner sweep stroke
-  ctx.beginPath();
-  ctx.setLineDash([5, 5]);
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = color;
-  ctx.globalAlpha = 0.5;
-  ctx.shadowBlur = 0;
-  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.setLineDash([]); // reset dash so it doesn't leak into other draws
-
-  // Inner sweep — solid progress arc, starts at 12 o'clock, sweeps clockwise
-  ctx.beginPath();
-  ctx.lineWidth = 5;
-  ctx.lineCap = "round";
-  ctx.strokeStyle = color;
-  ctx.globalAlpha = alpha;
   ctx.shadowColor = color;
   ctx.shadowBlur = glow;
-  const startAngle = -Math.PI / 2;
-  const endAngle = startAngle + Math.PI * 2 * progress;
-  ctx.arc(cx, cy, radius - 7, startAngle, endAngle);
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 5;          // 🔥 thicker
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  const inset = 6;            // gap inside box edge
+  const ext   = 8;            // how far brackets stick outside the box
+  const arm   = Math.min(w, h) * 0.22;
+
+  // --- 1. Corner brackets (crosshair style) ---
+  // Top-left
+  ctx.beginPath();
+  ctx.moveTo(x - ext, y + inset);
+  ctx.lineTo(x + arm, y + inset);
+  ctx.moveTo(x + inset, y - ext);
+  ctx.lineTo(x + inset, y + arm);
   ctx.stroke();
 
-  ctx.restore();
+  // Top-right
+  ctx.beginPath();
+  ctx.moveTo(x + w + ext, y + inset);
+  ctx.lineTo(x + w - arm, y + inset);
+  ctx.moveTo(x + w - inset, y - ext);
+  ctx.lineTo(x + w - inset, y + arm);
+  ctx.stroke();
 
-  // Center countdown number (1, 2, 3...) while locking on
+  // Bottom-left
+  ctx.beginPath();
+  ctx.moveTo(x - ext, y + h - inset);
+  ctx.lineTo(x + arm, y + h - inset);
+  ctx.moveTo(x + inset, y + h + ext);
+  ctx.lineTo(x + inset, y + h - arm);
+  ctx.stroke();
+
+  // Bottom-right
+  ctx.beginPath();
+  ctx.moveTo(x + w + ext, y + h - inset);
+  ctx.lineTo(x + w - arm, y + h - inset);
+  ctx.moveTo(x + w - inset, y + h + ext);
+  ctx.lineTo(x + w - inset, y + h - arm);
+  ctx.stroke();
+
+  // --- 2. Center cross (+) with gap so the face stays visible ---
+  const crossLen = Math.min(w, h) * 0.14;
+  const gap = 5;
+  ctx.beginPath();
+  // Horizontal
+  ctx.moveTo(cx - crossLen, cy);
+  ctx.lineTo(cx - gap, cy);
+  ctx.moveTo(cx + gap, cy);
+  ctx.lineTo(cx + crossLen, cy);
+  // Vertical
+  ctx.moveTo(cx, cy - crossLen);
+  ctx.lineTo(cx, cy - gap);
+  ctx.moveTo(cx, cy + gap);
+  ctx.lineTo(cx, cy + crossLen);
+  ctx.stroke();
+
+  // --- 3. Tiny progress arc on top edge (keeps the "filling up" feel) ---
+  if (count !== null && count > 0) {
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    const arcR = Math.min(w, h) * 0.10;
+    const startA = -Math.PI / 2;
+    const endA = startA + Math.PI * 2 * progress;
+    ctx.arc(cx, y + inset, arcR, startA, endA);
+    ctx.stroke();
+  }
+
+  // --- 4. Count badge OUTSIDE the box (above center) ---
   if (count !== null) {
-    ctx.save();
-    ctx.font = "bold 30px sans-serif";
+    const badgeR = 16;
+    const badgeY = y - 28;
+
+    // Connector line
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(cx, y - 4);
+    ctx.lineTo(cx, badgeY + badgeR);
+    ctx.stroke();
+
+    // Circle badge
+    ctx.shadowBlur = glow * 0.6;
+    ctx.globalAlpha = 0.95;
+    ctx.beginPath();
+    ctx.arc(cx, badgeY, badgeR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Number text
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 15px sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillStyle = color;
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 10;
-    ctx.globalAlpha = alpha;
-    ctx.fillText(String(count), cx, cy);
-    ctx.restore();
+    ctx.globalAlpha = 1;
+    ctx.fillText(String(count), cx, badgeY);
   }
-}
 
+  ctx.restore();
+}
 // ===== ADD SCAN =====
 function addFaceScan(student) {
   if (!currentPeriod || currentPeriod.isOutside) {
