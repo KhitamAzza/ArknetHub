@@ -22,9 +22,8 @@ async function fetchJsonWithRetry(url, retries = 2, delayMs = 700) {
 const OPERATORS = {
   "azkiahasna": { name: "Chusnul Khitam Azza", ekstra: "MASTER", isMaster: true },
   "devkoord1": { name: "Hernanda", ekstra: "MASTER", isMaster: true },
-  "devkoord2": { name: "Masduki Zen", ekstra: "MASTER", isMaster: true },
-  // "devtatib1": { name: "Syamsul Arif", ekstra: "MASTER", isMaster: true },
-  // "devtatib2": { name: "Siti Munawaroh", ekstra: "MASTER", isMaster: true },
+  "tatib1": { name: "Syamsul Arif", ekstra: "TATIB", isTatib: true },      // ← ADD
+  "tatib2": { name: "Siti Munawaroh", ekstra: "TATIB", isTatib: true },    // ← ADD
   "eksesport": { name: "Masduki Zen", ekstra: "E-Sport" },
   "eksfutsal": { name: "Rizky", ekstra: "Futsal" },
   "ekspakbola": { name: "Rico Yoga", ekstra: "Sepakbola" },
@@ -67,6 +66,7 @@ let appBundle = null;   // cached bundle data
 let bundlePromise = null; // dedup concurrent calls
 
 let isHelper = false;
+let isTatib = false;
 
 // ===== DOM REFS =====
 const loginScreen = document.getElementById("loginScreen");
@@ -104,16 +104,20 @@ function hideAllScreens() {
     "adminScreen", "helperScreen", "overseerScreen",
     "fixerScreen", "configScreen", "lateRecordScreen",
     "faceScanScreen", "danaHistoryScreen", "syaratScreen",
-    "daftarScreen", "searchOverlay", "ketuaScreen"   // ← ADDED
+    "daftarScreen", "searchOverlay", "ketuaScreen",
+    "tatibScreen", "tatibPaymentScreen", "tatibHeatmapScreen"
   ];
   ids.forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = "none";
   });
+  
+  const tatibModal = document.getElementById("tatibPaymentModal");
+  if (tatibModal) tatibModal.classList.remove("visible");
+  
   if (summaryModal) summaryModal.classList.remove("visible");
   closeSearch();
 }
-
 // ===== LOGIN / LOGOUT =====
 async function doLogin() {
   const rawPassword = passwordInput.value.trim();
@@ -122,6 +126,17 @@ async function doLogin() {
   // === 1. TEACHER / ADMIN / PEMBINA ===
   if (OPERATORS[password]) {
     const op = OPERATORS[password];
+    // === TATIB MODE ===
+    if (op.isTatib) {
+      currentOperator = op.name;
+      currentEkstra = op.ekstra;
+      isMaster = false;
+      isHelper = false;
+      isTatib = true;
+      loginError.style.display = "none";
+      showTatibScreen();
+      return;
+    }
     currentOperator = op.name;
     currentEkstra = op.ekstra;
     isMaster = !!op.isMaster;
@@ -153,6 +168,7 @@ async function doLogin() {
     updateRegBadge();
     return;
   }
+  
 
   // === 2. FETCH CONFIG ONCE FOR HELPER & KETUA ===
   let cfg = null;
@@ -202,6 +218,7 @@ async function doLogin() {
   passwordInput.focus();
 }
 
+
 // ===== NAVIGATION =====
 function showDashboard() {
   if (dashboardScreen) dashboardScreen.style.display = "flex";
@@ -212,6 +229,15 @@ function showDashboard() {
   const helper = document.getElementById("helperScreen");
   if (admin) admin.style.display = "none";
   if (helper) helper.style.display = "none";
+}
+function showTatibScreen() {
+  hideAllScreens();
+  const el = document.getElementById("tatibScreen");
+  if (el) {
+    el.style.display = "flex";
+    const nameEl = document.getElementById("tatibName");
+    if (nameEl) nameEl.textContent = currentOperator || "Tatib";
+  }
 }
 
 function showAdminScreen() {
@@ -287,6 +313,7 @@ function doLogout() {
   currentEkstra = null;
   isMaster = false;
   isHelper = false;
+  isTatib = false;
   currentMode = null;
   allStudents = [];
   totalStudents = [];
