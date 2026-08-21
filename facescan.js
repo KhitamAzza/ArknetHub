@@ -27,6 +27,8 @@ const EXCLUDE_CAM_TERMS = ['wide', 'ultra', 'tele', 'macro', 'depth', '0.5x', '2
 const CONFIRM_FRAMES = 3;      // Need 3 consecutive good matches
 let facePendingConfirm = new Map(); // nama → {count, data}
 let verifyMode = 'list'; // 'list' | 'photo'
+let faceAutoSubmitTimer = null;
+const AUTO_SUBMIT_DELAY = 30000; // 30 seconds
 
 // ===== DOM REFS (lazy init) =====
 function getFaceRefs() {
@@ -71,6 +73,7 @@ function showFaceID() {
 }
 
 function hideFaceScan() {
+  clearAutoSubmitTimer();   // ← ADD
   const refs = getFaceRefs();
   stopFaceCamera();
   faceScanScreenActive = false;
@@ -208,6 +211,22 @@ async function loadFaceDatabase() {
   }
 
   console.log("Loaded " + faceDescriptors.length + " face descriptors");
+}
+function resetAutoSubmitTimer() {
+  clearAutoSubmitTimer();
+  if (faceUnsentQueue.length === 0) return;
+  faceAutoSubmitTimer = setTimeout(() => {
+    if (faceUnsentQueue.length > 0 && !isSendingChunk) {
+      submitFaceChunk();
+    }
+  }, AUTO_SUBMIT_DELAY);
+}
+
+function clearAutoSubmitTimer() {
+  if (faceAutoSubmitTimer) {
+    clearTimeout(faceAutoSubmitTimer);
+    faceAutoSubmitTimer = null;
+  }
 }
 
 // ===== LOAD CURRENT PERIOD (+ SHEET STATUS) =====
@@ -792,7 +811,7 @@ function addFaceScan(student) {
   if (faceUnsentQueue.length >= CHUNK_SIZE) {
     submitFaceChunk();
   }
-
+resetAutoSubmitTimer();   // ← ADD
   showStatus("✓ " + student.nama, "ok");
 }
 
@@ -872,6 +891,7 @@ function removeFaceScan(nama) {
 }
 // ===== SUBMIT =====
 async function submitFaceScans() {
+   clearAutoSubmitTimer();
   const btn = document.getElementById("faceBtnSimpan");
   if (btn) btn.disabled = true;
 
@@ -908,6 +928,7 @@ async function submitFaceScans() {
 }
 
 function batalFaceScan() {
+   clearAutoSubmitTimer();
   const unsentCount = faceUnsentQueue.length;
   if (unsentCount > 0) {
     if (!confirm(`Batalkan? ${unsentCount} siswa belum terkirim dan akan hilang.`)) return;
@@ -1006,6 +1027,14 @@ function renderVerifyList() {
   const container = document.getElementById('verifyListLarge');
   if (!container) return;
 
+  // Event delegation for desktop remove buttons
+  container.onclick = (e) => {
+    const btn = e.target.closest('.verify-item-remove');
+    if (!btn) return;
+    const nama = decodeURIComponent(btn.dataset.nama || '');
+    if (nama) removeFaceScan(nama);
+  };
+
   const scans = Array.from(faceScanned.values()).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
   if (scans.length === 0) {
@@ -1028,22 +1057,30 @@ function renderVerifyList() {
           <div class="verify-item-meta">${escapeHtml(s.kelas)} • ${escapeHtml(s.ekstra || currentEkstra || '-')}</div>
         </div>
         <div class="verify-item-status">${isSynced ? '✓ Tersimpan' : '⏳ Menunggu'}</div>
+        <button class="verify-item-remove" data-nama="${encodeURIComponent(s.nama)}" title="Hapus (face mismatch)">✕</button>
       </div>
     `;
   }).join('');
 }
-
+function removeCurrentVerifyPhoto() {
+  const nameEl = document.getElementById('verifyPhotoName');
+  if (nameEl && nameEl.textContent && nameEl.textContent !== '-') {
+    removeFaceScan(nameEl.textContent);
+  }
+}
 function renderVerifyPhoto() {
   const emptyEl = document.getElementById('verifyPhotoEmpty');
   const cardEl = document.getElementById('verifyPhotoCard');
   const imgEl = document.getElementById('verifyPhotoImg');
   const fallbackEl = document.getElementById('verifyPhotoFallback');
+  const removeBtn = document.getElementById('verifyPhotoRemove'); // ← ADD
   if (!emptyEl || !cardEl) return;
 
   const scans = Array.from(faceScanned.values());
   if (scans.length === 0) {
     emptyEl.style.display = 'flex';
     cardEl.style.display = 'none';
+    if (removeBtn) removeBtn.style.display = 'none'; // ← ADD
     return;
   }
 
@@ -1053,6 +1090,7 @@ function renderVerifyPhoto() {
 
   emptyEl.style.display = 'none';
   cardEl.style.display = 'flex';
+  if (removeBtn) removeBtn.style.display = 'flex'; // ← ADD
 
   if (imgEl) {
     imgEl.style.display = 'block';
