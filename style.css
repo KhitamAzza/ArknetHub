@@ -2071,3 +2071,41 @@ html, body {
     border: 1px solid rgba(16, 185, 129, 0.2);
   }
 }
+  .verify-item-remove {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--red);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 12px;
+    flex-shrink: 0;
+    transition: all 0.15s;
+    margin-left: 4px;
+  }
+  .verify-item-remove:active { transform: scale(0.9); background: rgba(239, 68, 68, 0.3); }
+
+  .verify-photo-remove {
+    margin-top: 16px;
+    padding: 10px 24px;
+    border-radius: 12px;
+    border: 1px solid var(--red);
+    background: rgba(239, 68, 68, 0.08);
+    color: var(--red);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    display: none;          /* toggled to flex by JS */
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.15s;
+  }
+  .verify-photo-remove:active {
+    background: rgba(239, 68, 68, 0.15);
+    transform: scale(0.98);
+  }
