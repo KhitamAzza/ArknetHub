@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="helper.css">
   <link rel="stylesheet" href="admin.css">
   <link rel="stylesheet" href="ketua.css">
+  <link rel="stylesheet" href="tatib.css">
   <base target="_blank">
 </head>
 <body>
@@ -663,6 +664,9 @@
             <div class="verify-photo-class" id="verifyPhotoClass">-</div>
             <div class="verify-photo-ekstra" id="verifyPhotoEkstra">-</div>
             <div class="verify-photo-status" id="verifyPhotoStatus">HADIR</div>
+            <button class="verify-photo-remove" id="verifyPhotoRemove" onclick="removeCurrentVerifyPhoto()" style="display:none;">
+              <span>✕</span> Hapus (Mismatch)
+              </button>
           </div>
         </div>
       </div>
@@ -724,6 +728,131 @@
     </div>
   </div>
 </div>
+
+<!-- TATIB DASHBOARD -->
+<div id="tatibScreen" style="display:none;">
+  <div class="dashboard-header">
+    <div class="welcome-title">Panel Tata Tertib</div>
+    <div class="teacher-name" id="tatibName">-</div>
+    <div class="school-name">SMK Diponegoro Tumpang</div>
+  </div>
+  <div class="dashboard-grid">
+    <div class="dash-btn" onclick="showTatibPayment()">
+      <div class="dash-icon">💰</div>
+      <div class="dash-label">Pembayaran Denda</div>
+    </div>
+    <div class="dash-btn" onclick="showTatibHeatmap()">
+      <div class="dash-icon">🔥</div>
+      <div class="dash-label">Heatmap Pelanggaran</div>
+    </div>
+    <div class="dash-btn logout" onclick="doLogout()">
+      <div class="dash-icon">🚪</div>
+      <div class="dash-label">Keluar</div>
+    </div>
+  </div>
+</div>
+
+<!-- TATIB PAYMENT SCREEN (Full Page List) -->
+<div id="tatibPaymentScreen" style="display:none;">
+  <div class="app-header">
+    <button class="icon-btn" onclick="backToTatib()">◀</button>
+    <div class="operator-info" style="flex:1; margin-left:12px;">
+      <div class="operator-name">Pembayaran Denda</div>
+      <div class="operator-ekstra">Daftar siswa berdenda</div>
+    </div>
+  </div>
+  
+  <div class="tatib-search-wrap">
+    <input type="text" id="tatibSearchInput" class="tatib-search-input" placeholder="Cari nama atau kelas..." oninput="onTatibSearchInput()" autocomplete="off">
+  </div>
+  
+  <div class="tatib-debt-list-container" id="tatibDebtListContainer"></div>
+  
+  <div class="empty-state" id="tatibDebtEmpty" style="display:none;">
+    <div class="empty-state-icon">📭</div>
+    <div class="empty-state-text">Tidak ada siswa dengan denda</div>
+  </div>
+</div>
+
+<!-- TATIB PAYMENT MODAL (Input Payment) -->
+<div id="tatibPaymentModal" class="modal-overlay">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title">💰 Input Pembayaran</div>
+      <button class="icon-btn" onclick="closeTatibPaymentModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="tatib-detail-header">
+        <div class="tatib-detail-name" id="tatibPayName">-</div>
+        <div class="tatib-detail-class" id="tatibPayClass">-</div>
+      </div>
+      
+      <div class="tatib-debt-cards">
+        <div class="tatib-debt-card">
+          <div class="tatib-debt-card-label">Total</div>
+          <div class="tatib-debt-card-value" id="tatibPayTotal">Rp 0</div>
+        </div>
+        <div class="tatib-debt-card">
+          <div class="tatib-debt-card-label">Sudah</div>
+          <div class="tatib-debt-card-value green" id="tatibPayPaid">Rp 0</div>
+        </div>
+        <div class="tatib-debt-card">
+          <div class="tatib-debt-card-label">Sisa</div>
+          <div class="tatib-debt-card-value red" id="tatibPaySisa">Rp 0</div>
+        </div>
+      </div>
+      
+      <div class="tatib-section-title">Riwayat Pembayaran</div>
+      <div class="tatib-history-list" id="tatibPayHistory"></div>
+      
+      <div class="form-group">
+        <label class="form-label">Jumlah Pembayaran</label>
+        <input type="text" id="tatibPayAmount" class="form-input" placeholder="Rp 0" oninput="formatTatibAmount(this)">
+        <div class="tatib-pay-hint" id="tatibPayHint">Maksimal: Rp 0</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeTatibPaymentModal()">Batal</button>
+      <button class="btn-primary" id="tatibPaySubmitBtn" onclick="submitTatibPayment()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- TATIB HEATMAP SCREEN -->
+<div id="tatibHeatmapScreen" style="display:none;">
+  <div class="app-header">
+    <button class="icon-btn" onclick="backToTatib()">◀</button>
+    <div class="operator-info" style="flex:1; margin-left:12px;">
+      <div class="operator-name">Heatmap Pelanggaran</div>
+      <div class="operator-ekstra">Visualisasi per kelas & ekstra</div>
+    </div>
+  </div>
+
+  <div class="heatmap-toggle-wrap">
+    <button class="heatmap-toggle active" id="heatmapToggleKelas" onclick="setHeatmapMode('kelas')">📚 Per Kelas</button>
+    <button class="heatmap-toggle" id="heatmapToggleEkstra" onclick="setHeatmapMode('ekstra')">⚽ Per Ekstra</button>
+  </div>
+
+  <div class="heatmap-legend">
+    <div class="heatmap-legend-item">
+      <div class="heatmap-legend-dot" style="background:var(--red);"></div> Alpha
+    </div>
+    <div class="heatmap-legend-item">
+      <div class="heatmap-legend-dot" style="background:var(--yellow);"></div> Terlambat
+    </div>
+    <div class="heatmap-legend-item">
+      <div class="heatmap-legend-dot" style="background:var(--accent);"></div> Pagi
+    </div>
+  </div>
+
+  <div class="heatmap-list" id="tatibHeatmapList"></div>
+
+  <div class="heatmap-empty" id="tatibHeatmapEmpty" style="display:none;">
+    <div class="empty-state-icon">📭</div>
+    <div class="empty-state-text">Tidak ada data pelanggaran</div>
+  </div>
+</div>
+
 <!-- ===== LATE RECORD SCREEN ===== -->
 <div id="lateRecordScreen" style="display:none;">
   <div class="app-header">
@@ -807,6 +936,7 @@
 <script src="facescan.js"></script>
 <script src="helper.js"></script>
 <script src="admin.js"></script>
+<script src="tatib.js"></script>
 
 </body>
 </html>
