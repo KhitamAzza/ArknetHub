@@ -1,0 +1,434 @@
+/* ===== OVERSEER VIEW ===== */
+#overseerScreen {
+  display: none;
+  flex-direction: column;
+  height: 100dvh;
+  background: var(--bg);
+}
+
+.overseer-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.overseer-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 20px;
+}
+
+.overseer-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.overseer-card-title {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.overseer-date-btn {
+  padding: 8px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s;
+}
+
+.overseer-date-btn:active {
+  background: var(--border);
+  transform: scale(0.96);
+}
+
+.overseer-bar-wrap {
+  display: flex;
+  height: 32px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg);
+  margin-bottom: 16px;
+}
+
+.overseer-bar-seg {
+  height: 100%;
+  transition: width 0.4s ease;
+  min-width: 0;
+}
+
+.overseer-legend {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.overseer-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.overseer-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.overseer-legend-label {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.overseer-legend-count {
+  color: var(--text);
+  font-weight: 700;
+  margin-left: auto;
+  margin-right: 4px;
+}
+
+.overseer-legend-pct {
+  color: var(--text-secondary);
+  font-weight: 600;
+  min-width: 36px;
+  text-align: right;
+}
+
+.overseer-empty {
+  text-align: center;
+  padding: 32px;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+/* Placeholder cards */
+.overseer-card.placeholder {
+  opacity: 0.6;
+}
+
+.overseer-placeholder-text {
+  text-align: center;
+  padding: 24px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* Date list inside modal */
+.overseer-date-list {
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.overseer-date-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+
+.overseer-date-item:last-child {
+  border-bottom: none;
+}
+
+.overseer-date-item:active,
+.overseer-date-item.active {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--accent);
+}
+
+.overseer-date-check {
+  font-size: 14px;
+  font-weight: 800;
+}
+/* ===== SISWA BERMASALAH ===== */
+.overseer-alpha-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.overseer-alpha-class {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.overseer-alpha-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  cursor: pointer;
+  gap: 12px;
+  transition: background 0.15s;
+}
+
+.overseer-alpha-header:active {
+  background: var(--border);
+}
+
+.overseer-alpha-classname {
+  font-size: 14px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.overseer-alpha-meta {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  margin-left: auto;
+}
+
+.overseer-alpha-arrow {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.overseer-alpha-students {
+  padding: 0 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: slideDown 0.2s ease;
+}
+
+.overseer-alpha-student {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--card);
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.overseer-alpha-count {
+  font-weight: 700;
+  color: var(--red);
+  font-size: 12px;
+}
+
+.overseer-alpha-actions {
+  margin-top: 4px;
+}
+
+.overseer-wa-class-btn {
+  width: 100%;
+  padding: 12px;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, #25d366, #128c7e);
+  color: white;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.overseer-wa-class-btn:active {
+  transform: scale(0.98);
+  opacity: 0.9;
+}
+
+.overseer-wa-missing {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 8px;
+}
+
+.overseer-alpha-footer {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.overseer-wa-all-btn {
+  width: 100%;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--green);
+  background: rgba(16, 185, 129, 0.08);
+  color: var(--green);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.15s;
+}
+
+.overseer-wa-all-btn:active {
+  background: rgba(16, 185, 129, 0.15);
+  transform: scale(0.98);
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+/* ===== JUMLAH SISWA PER EKSKUL ===== */
+.overseer-ekstra-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.overseer-ekstra-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: var(--bg);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  font-size: 14px;
+}
+
+.overseer-ekstra-name {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.overseer-ekstra-count {
+  font-weight: 700;
+  color: var(--accent);
+  font-size: 13px;
+}
+.overseer-wa-report-btn {
+  width: 100%;
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--green);
+  background: rgba(16, 185, 129, 0.08);
+  color: var(--green);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.15s;
+}
+
+.overseer-wa-report-btn:active {
+  background: rgba(16, 185, 129, 0.15);
+  transform: scale(0.98);
+}
+/* ===== CARD TOGGLE ===== */
+.overseer-card-toggle {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.overseer-card-toggle:active {
+  background: var(--border);
+  transform: scale(0.92);
+}
+
+/* ===== COMPACT / SHRUNK VIEW ===== */
+.overseer-compact-wrap {
+  padding: 4px 0 8px;
+}
+
+.overseer-compact-stats {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 16px;
+  padding: 14px 10px;
+  background: var(--bg);
+  border-radius: 16px;
+  border: 1px solid var(--border);
+}
+
+.overseer-compact-stat {
+  text-align: center;
+}
+
+.overseer-compact-num {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.overseer-compact-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.overseer-compact-top {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.overseer-compact-class {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  background: var(--bg);
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  font-size: 14px;
+}
+
+.overseer-compact-name {
+  font-weight: 700;
+}
+
+.overseer-compact-count {
+  color: var(--red);
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.overseer-compact-more {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 10px;
+  font-weight: 600;
+}

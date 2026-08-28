@@ -1,0 +1,1163 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0f172a">
+  <title>ArkNet Hub</title>
+  <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="facescan.css">
+  <link rel="stylesheet" href="helper.css">
+  <link rel="stylesheet" href="admin.css">
+  <link rel="stylesheet" href="ketua.css">
+  <link rel="stylesheet" href="tatib.css">
+  <link rel="stylesheet" href="overseer.css">
+
+  <base target="_blank">
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-logo">📋</div>
+  <div class="login-title">ArkNet Hub</div>
+  <div class="login-subtitle">1 Platform untuk berbagai kebutuhan ekstrakurikuler</div>
+  <input type="password" id="passwordInput" class="login-input" placeholder="Password" autocomplete="off" inputmode="verbatim">
+         <button class="login-btn" onclick="doLogin()">Masuk</button>
+  <button class="login-btn" style="margin-top:12px;background:linear-gradient(135deg,#10b981,#059669);box-shadow:0 4px 15px rgba(16,185,129,0.3);" onclick="showKetuaLogin()">🔑 Login Ketua</button>
+  <div class="login-error" id="loginError">❌ Password salah</div>
+</div>
+
+<!-- DASHBOARD (Pembina) -->
+<div id="dashboardScreen">
+  <div class="dashboard-header">
+    <div class="welcome-title">Selamat datang</div>
+    <div class="teacher-name" id="dashTeacherName">-</div>
+    <div class="school-name">di portal Ekstrakurikuler<br>SMK Diponegoro Tumpang</div>
+  </div>
+  <div class="dashboard-grid">
+    <div class="dash-btn" onclick="showAbsenMenu()">
+      <div class="dash-icon">📋</div>
+      <div class="dash-label">Absen Siswa</div>
+    </div>
+    <div class="dash-btn" id="regDashBtn" onclick="showRegistration()">
+      <div class="dash-icon">📝</div>
+      <div class="dash-label">Pendaftaran Ekskul</div>
+      <span class="dash-badge" id="regBadge" style="display:none;">0</span>
+    </div>
+    <div class="dash-btn" onclick="showDaftarSiswa()">
+      <div class="dash-icon">👥</div>
+      <div class="dash-label">Kelola siswa</div>
+    </div>
+    <div class="dash-btn" onclick="showSyaratKhusus()">
+      <div class="dash-icon">✨</div>
+      <div class="dash-label">Syarat Khusus</div>
+    </div>
+    <div class="dash-btn" onclick="openDanaModal()">
+      <div class="dash-icon">💰</div>
+      <div class="dash-label">Pengajuan Dana</div>
+    </div>
+    <div class="dash-btn logout" onclick="doLogout()">
+      <div class="dash-icon">🚪</div>
+      <div class="dash-label">Keluar</div>
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN DASHBOARD -->
+<div id="adminScreen" style="display:none;">
+  <div class="dashboard-header">
+    <div class="welcome-title">Panel Admin</div>
+    <div class="teacher-name" id="adminTeacherName">-</div>
+    <div class="school-name">SMK Diponegoro Tumpang</div>
+  </div>
+  <div class="dashboard-grid admin-grid">
+    <div class="dash-btn" onclick="showAdminAbsen()">
+      <div class="dash-icon">📋</div>
+      <div class="dash-label">Absen Siswa</div>
+      <div class="dash-desc">Semua siswa</div>
+    </div>
+    <div class="dash-btn" onclick="showFixerMode()">
+      <div class="dash-icon">🔧</div>
+      <div class="dash-label">Fixer Mode</div>
+      <div class="dash-desc">Ubah absensi</div>
+    </div>
+    <div class="dash-btn" onclick="showConfigMenu()">
+      <div class="dash-icon">⚙️</div>
+      <div class="dash-label">Config Menu</div>
+      <div class="dash-desc">Pengaturan sistem</div>
+    </div>
+      <div class="dash-btn" onclick="showOverseerView()">
+  <div class="dash-icon">👁️</div>
+  <div class="dash-label">Overseer View</div>
+  <div class="dash-desc">Pantau ekskul</div>
+</div>
+    <div class="dash-btn" onclick="showKelolaSiswa()">
+  <div class="dash-icon">👤</div>
+  <div class="dash-label">Kelola Siswa</div>
+  <div class="dash-desc">Ubah ekstra & riwayat</div>
+</div>
+        <div class="dash-btn logout" onclick="doLogout()">
+      <div class="dash-icon">🚪</div>
+      <div class="dash-label">Keluar</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- FIXER MODE SCREEN -->
+<div id="fixerScreen" style="display:none;">
+  <div class="app-header">
+    <button class="icon-btn" onclick="backToAdmin()">◀</button>
+    <div class="operator-info" style="flex:1; margin-left:12px;">
+      <div class="operator-name">Fixer Mode</div>
+      <div class="operator-ekstra">Ubah data absensi</div>
+    </div>
+  </div>
+
+  <div class="fixer-search-wrap">
+    <input type="text" id="fixerSearchInput" class="fixer-search-input" placeholder="Cari nama siswa..." autocomplete="off">
+    <div class="fixer-predictive" id="fixerPredictive"></div>
+  </div>
+
+  <div class="fixer-student-area" id="fixerStudentArea" style="display:none;">
+    <div class="fixer-profile">
+      <img class="fixer-photo" id="fixerPhoto" src="" onerror="this.style.display='none'">
+      <div class="fixer-info">
+        <div class="fixer-name" id="fixerName">-</div>
+        <div class="fixer-class" id="fixerClass">-</div>
+        <div class="fixer-ekstra" id="fixerEkstra">-</div>
+      </div>
+    </div>
+
+    <div class="fixer-dates-header">Riwayat Absensi</div>
+    <div class="fixer-dates-list" id="fixerDatesList"></div>
+  </div>
+
+  <div class="fixer-empty" id="fixerEmpty">
+    <div class="empty-state-icon">🔍</div>
+    <div class="empty-state-text">Cari siswa untuk mengubah absensi</div>
+  </div>
+</div>
+
+<!-- FIXER EDIT MODAL -->
+<div id="fixerEditModal" class="modal-overlay">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title">Ubah Status</div>
+      <button class="icon-btn" onclick="closeFixerEdit()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="fixer-edit-info">
+        <div class="fixer-edit-name" id="fixEditName">-</div>
+        <div class="fixer-edit-date" id="fixEditDate">-</div>
+      </div>
+      <div class="fixer-status-grid" id="fixerStatusGrid">
+        <button class="fixer-status-btn" data-status="ALPHA">ALPHA</button>
+        <button class="fixer-status-btn" data-status="HADIR">HADIR</button>
+        <button class="fixer-status-btn" data-status="TERLAMBAT">TERLAMBAT</button>
+        <button class="fixer-status-btn" data-status="PAGI">PAGI</button>
+        <button class="fixer-status-btn" data-status="IZIN">IZIN</button>
+        <button class="fixer-status-btn" data-status="SAKIT">SAKIT</button>
+      </div>
+      <div class="fixer-custom-wrap">
+        <label class="form-label">Custom</label>
+        <input type="text" id="fixerCustomInput" class="form-input" placeholder="Status lain..." maxlength="20">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeFixerEdit()">Batal</button>
+      <button class="btn-primary" onclick="saveFixerEdit()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIG MENU SCREEN -->
+<div id="configScreen" style="display:none;">
+  <div class="app-header">
+    <button class="icon-btn" onclick="backToAdmin()">◀</button>
+    <div class="operator-info" style="flex:1; margin-left:12px;">
+      <div class="operator-name">Config Menu</div>
+      <div class="operator-ekstra">Pengaturan Sistem</div>
+    </div>
+  </div>
+
+  <div class="config-tabs">
+    <button class="config-tab active" id="configTabBtn" onclick="switchConfigTab('config')">Konfigurasi</button>
+    <button class="config-tab" id="ketuaTabBtn" onclick="switchConfigTab('ketua')">Kode Ketua</button>
+  </div>
+
+  <div class="config-list" id="configList"></div>
+  <div class="ketua-list" id="ketuaList" style="display:none;"></div>
+
+  <div class="config-bottom-bar" id="configBottomBar">
+    <button class="btn-primary" id="configSaveBtn" onclick="saveConfigChanges()" disabled>Simpan Perubahan</button>
+  </div>
+</div>
+<!-- OVERSEER SCREEN -->
+<div id="overseerScreen" style="display:none;">
+  <div class="app-header">
+    <button class="icon-btn" onclick="backToAdmin()">◀</button>
+    <div class="operator-info" style="flex:1; margin-left:12px;">
+      <div class="operator-name">Overseer View</div>
+      <div class="operator-ekstra">Pantau semua ekskul</div>
+    </div>
+  </div>
+
+  <div class="overseer-content">
+    <!-- Section 1: Daily Attendance -->
+    <div class="overseer-card">
+      <div class="overseer-card-header">
+        <div class="overseer-card-title">📊 Kehadiran Harian</div>
+        <button class="overseer-date-btn" id="overseerDateBtn" onclick="toggleDatePicker()">📅 <span id="overseerDateLabel">-</span></button>
+      </div>
+      <div class="overseer-bar-wrap" id="overseerBarWrap">
+        <div class="overseer-empty">Memuat...</div>
+      </div>
+      <div class="overseer-legend" id="overseerLegend"></div>
+      <button class="overseer-wa-report-btn" onclick="openWaReportModal()">📤 Kirim Laporan WA</button>
+    </div>
+
+        <!-- Section 2: Siswa Bermasalah -->
+<div class="overseer-card">
+  <div class="overseer-card-header">
+    <div class="overseer-card-title">🚨 Siswa Bermasalah</div>
+    <button class="overseer-card-toggle" id="alphaCardToggle" onclick="toggleAlphaCard()" title="Perkecil/Perbesar">📁</button>
+  </div>
+  <div class="overseer-alpha-list" id="overseerAlphaList">
+    <div class="overseer-empty">Memuat...</div>
+  </div>
+  <div class="overseer-alpha-footer" style="display:none;">
+    <button class="overseer-wa-all-btn" onclick="sendAllWakelWa()">📤 Kirim WA ke Seluruh Wakel</button>
+  </div>
+</div>
+
+        <!-- Section 3: Jumlah Siswa per Ekskul -->
+    <div class="overseer-card">
+      <div class="overseer-card-header">
+        <div class="overseer-card-title">⚽ Jumlah Siswa per Ekskul</div>
+      </div>
+      <div class="overseer-ekstra-list" id="overseerEkstraList">
+        <div class="overseer-empty">Memuat...</div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- OVERSEER DATE PICKER MODAL -->
+<div id="overseerDateModal" class="modal-overlay">
+  <div class="modal-sheet" style="max-width:320px;">
+    <div class="modal-header">
+      <div class="modal-title">📅 Pilih Tanggal</div>
+      <button class="icon-btn" onclick="closeOverseerDateModal()">✕</button>
+    </div>
+    <div class="modal-body" style="padding:0;max-height:50vh;">
+      <div class="overseer-date-list" id="overseerDateList"></div>
+    </div>
+  </div>
+</div>
+<!-- WA REPORT MODAL -->
+<div id="waReportModal" class="modal-overlay">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title">📤 Laporan Kehadiran</div>
+      <button class="icon-btn" onclick="closeWaReportModal()">✕</button>
+    </div>
+    <div class="modal-body" style="padding:0;max-height:60vh;overflow:hidden;">
+      <!-- Step 1: Pick date -->
+      <div id="waReportDateStep">
+        <div style="padding:16px 20px 8px;font-size:13px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;">Pilih Tanggal</div>
+        <div class="overseer-date-list" id="waReportDateList"></div>
+      </div>
+      <!-- Step 2: Warning -->
+      <div id="waReportWarning" style="display:none;padding:24px 20px;text-align:center;">
+        <div style="font-size:40px;margin-bottom:12px;">⚠️</div>
+        <div style="font-size:15px;font-weight:700;color:var(--red);margin-bottom:8px;" id="waReportWarningText">-</div>
+        <div style="font-size:13px;color:var(--text-secondary);margin-bottom:20px;line-height:1.5;">Seluruh siswa yang kehadiran masih kosong/telat akan dianggap ALPHA</div>
+        <button class="btn-primary" style="width:100%;" onclick="proceedWaReport()">Lanjutkan</button>
+      </div>
+      <!-- Step 3: Preview list -->
+      <div id="waReportPreview" style="display:none;padding:16px;max-height:50vh;overflow-y:auto;">
+        <div id="waReportPreviewContent"></div>
+      </div>
+    </div>
+    <div class="modal-footer" id="waReportFooter" style="display:none;">
+      <button class="btn-secondary" onclick="closeWaReportModal()">Tutup</button>
+      <button class="btn-primary" onclick="sendWaReport()">Kirim ke WhatsApp</button>
+    </div>
+  </div>
+</div>
+<!-- KELOLA SISWA SCREEN -->
+<div id="kelolaSiswaScreen" style="display:none;">
+  <div class="app-header">
+    <button class="icon-btn" onclick="backToAdmin()">◀</button>
+    <div class="operator-info" style="flex:1; margin-left:12px;">
+      <div class="operator-name">Kelola Siswa</div>
+      <div class="operator-ekstra">Manajemen ekstra siswa</div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="kelola-tabs">
+    <button class="kelola-tab active" onclick="switchKelolaTab('kelola')">Kelola Siswa</button>
+    <button class="kelola-tab" onclick="switchKelolaTab('bermasalah')">Siswa Bermasalah</button>
+  </div>
+
+  <!-- TAB 1: KELOLA -->
+  <div id="kelolaTabContent" class="kelola-tab-content">
+    <div class="fixer-search-wrap">
+      <input type="text" id="kelolaSearchInput" class="fixer-search-input" placeholder="Cari nama siswa..." autocomplete="off">
+      <div class="fixer-predictive" id="kelolaPredictive"></div>
+    </div>
+
+    <div class="kelola-student-area" id="kelolaStudentArea" style="display:none;">
+      <div class="fixer-profile">
+        <img class="fixer-photo" id="kelolaPhoto" src="" onerror="this.style.display='none'">
+        <div class="fixer-info">
+          <div class="fixer-name" id="kelolaName">-</div>
+          <div class="fixer-class" id="kelolaClass">-</div>
+          <div class="fixer-ekstra" id="kelolaCurrentEkstra">-</div>
+        </div>
+      </div>
+
+      <div class="kelola-section">
+        <div class="kelola-section-title">Riwayat Kehadiran — <span id="kelolaSemesterLabel">-</span></div>
+        <div class="kelola-bar-wrap">
+          <div class="kelola-bar" id="kelolaBar"></div>
+          <div class="kelola-bar-legend" id="kelolaBarLegend"></div>
+        </div>
+      </div>
+
+      <div class="kelola-section">
+        <div class="kelola-section-title">Ubah Ekstra</div>
+        <select id="kelolaEkstraSelect" class="sort-select" style="width:100%;padding:14px;border-radius:14px;background:var(--bg);color:var(--text);font-size:15px;font-weight:600;border:1px solid var(--border);outline:none;"></select>
+        
+        <div class="kelola-alasan-wrap">
+          <label class="form-label">Alasan Perubahan (Wajib)</label>
+          <input type="text" id="kelolaAlasanInput" class="form-input" placeholder="Contoh: Pindah atas permintaan orang tua..." autocomplete="off">
+        </div>
+        
+        <button class="btn-primary" style="width:100%;margin-top:16px;" onclick="saveKelolaEkstra()">Simpan Perubahan</button>
+      </div>
+    </div>
+
+    <div class="fixer-empty" id="kelolaEmpty">
+      <div class="empty-state-icon">🔍</div>
+      <div class="empty-state-text">Cari siswa untuk mengelola ekstra</div>
+    </div>
+  </div>
+
+    <!-- TAB 2: SISWA BERMASALAH -->
+  <div id="bermasalahTabContent" class="kelola-tab-content" style="display:none;">
+    <div class="fixer-search-wrap" style="margin-bottom:12px;">
+      <input type="text" id="bermasalahSearchInput" class="fixer-search-input" placeholder="Cari nama atau kelas..." autocomplete="off" oninput="filterBermasalahList()">
+    </div>
+
+    <!-- Siswa tanpa ekskul banner -->
+    <div class="bermasalah-banner" id="bermasalahBanner" onclick="showTanpaEkstraModal()">
+      <div class="bermasalah-banner-icon">🚫</div>
+      <div class="bermasalah-banner-body">
+        <div class="bermasalah-banner-title">Siswa tanpa ekskul</div>
+        <div class="bermasalah-banner-sub">Belum terdaftar di ekstra manapun</div>
+      </div>
+      <div class="bermasalah-banner-badge" id="tanpaEkstraBadge">0</div>
+    </div>
+
+    <div class="kelola-section" style="margin-top:8px;">
+      <div class="kelola-section-title" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>Ranking Alpha Tertinggi</span>
+        <span style="font-size:11px;color:var(--text-secondary);font-weight:500;" id="bermasalahCountLabel">0 siswa</span>
+      </div>
+    </div>
+
+    <div class="bermasalah-list" id="bermasalahList"></div>
+    <div class="empty-state" id="bermasalahEmpty" style="display:none;padding-top:40px;">
+      <div class="empty-state-icon">✅</div>
+      <div class="empty-state-text">Tidak ada siswa bermasalah</div>
+    </div>
+  </div>
+  </div>
+
+<!-- WA PREVIEW MODAL -->
+<div id="waPreviewModal" class="modal-overlay">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title">📤 Kirim ke WhatsApp</div>
+      <button class="icon-btn" onclick="closeWaPreview()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="wa-preview-text" id="waPreviewText"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeWaPreview()">Batal</button>
+      <button class="btn-primary" onclick="confirmSendWa()">Buka WhatsApp</button>
+    </div>
+  </div>
+</div>
+
+<!-- ABSEN SUBMENU -->
+<div id="absenMenuScreen">
+  <div class="submenu-header">
+    <button class="icon-btn" onclick="backToDashboard()">◀</button>
+    <div class="submenu-title">Pilih metode absen</div>
+    <div style="width:40px;"></div>
+  </div>
+  <div class="submenu-buttons">
+    <button class="submenu-btn" onclick="showFaceID()">
+      <div class="submenu-icon">📷</div>
+      <div>Face ID</div>
+      <div class="submenu-desc">Absen dengan scan wajah</div>
+    </button>
+    <button class="submenu-btn" onclick="showReelAttendance()">
+      <div class="submenu-icon">✋</div>
+      <div>Manual Input</div>
+      <div class="submenu-desc">Absen dengan pilih nama</div>
+    </button>
+  </div>
+</div>
+
+<!-- REGISTRATION SCREEN -->
+<div id="registrationScreen">
+  <div class="reg-header">
+    <button class="icon-btn" onclick="backToDashboard()">◀</button>
+    <div class="reg-title">Pendaftaran Ekskul</div>
+      </div>
+
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-label">MENUNGGU</div>
+      <div class="stat-value" id="regStatTotal">0</div>
+    </div>
+    <div class="stat-card stat-green">
+      <div class="stat-label">DITERIMA</div>
+      <div class="stat-value" id="regStatApproved">0</div>
+    </div>
+    <div class="stat-card stat-red">
+      <div class="stat-label">DITOLAK</div>
+      <div class="stat-value" id="regStatRejected">0</div>
+    </div>
+  </div>
+
+  <div class="reel-area">
+    <button class="nav-arrow nav-left" onclick="prevReg()">◀</button>
+    <div class="reel-container" id="regReelContainer">
+      <div class="empty-state" id="regEmptyState">
+        <div class="empty-state-icon">📭</div>
+        <div class="empty-state-text">Tidak ada pendaftar</div>
+      </div>
+    </div>
+    <button class="nav-arrow nav-right" onclick="nextReg()">▶</button>
+  </div>
+
+    <div class="bottom-bar">
+    <div class="period-pill" id="regPill">PENDAFTARAN</div>
+    <button class="btn-send-compact" id="regKirimBtn" onclick="submitRegistrations()">Kirim</button>
+    <button class="icon-btn" onclick="refreshRegistrations()" title="Refresh">🔄</button>
+  </div>
+  </div>
+
+<!-- MAIN -->
+<div id="mainApp">
+  <div class="app-header">
+  <button class="icon-btn" onclick="safeBackToAbsenMenu()" title="Kembali">◀</button>
+  <div class="operator-info" style="flex:1; margin-left:12px;">
+    <div class="operator-name" id="operatorName">-</div>
+    <div class="operator-ekstra" id="operatorEkstra">-</div>
+  </div>
+  <div class="header-actions">
+    <button class="icon-btn" onclick="showList()" title="Daftar">📋</button>
+      </div>
+</div>
+
+  <!-- STATS BAR -->
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-label">TOTAL</div>
+      <div class="stat-value" id="statTotal">0</div>
+    </div>
+    <div class="stat-card stat-green">
+      <div class="stat-label">SUDAH</div>
+      <div class="stat-value" id="statHadir">0</div>
+      <div class="stat-sub" id="subHadir">0%</div>
+    </div>
+    <div class="stat-card stat-red">
+      <div class="stat-label">BELUM</div>
+      <div class="stat-value" id="statBelum">0</div>
+      <div class="stat-sub" id="subBelum">0%</div>
+    </div>
+  </div>
+
+  <!-- REEL AREA -->
+  <div class="reel-area">
+    <button class="nav-arrow nav-left" onclick="prevStudent()">◀</button>
+    
+    <div class="reel-container" id="reelContainer">
+      <div class="empty-state" id="emptyState">
+        <div class="empty-state-icon">📭</div>
+        <div class="empty-state-text">Tidak ada data siswa</div>
+      </div>
+    </div>
+    
+    <button class="nav-arrow nav-right" onclick="nextStudent()">▶</button>
+  </div>
+
+  
+  <!-- BOTTOM BAR -->
+    <!-- BOTTOM BAR -->
+  <div class="bottom-bar">
+    <div class="period-pill" id="periodPill">PAGI</div>
+    <button class="btn-search" onclick="openSearch()" title="Cari siswa">🔍</button>
+    <button class="btn-send-compact" id="kirimBtn" onclick="submitAttendance()">Kirim</button>
+  </div>
+</div>
+<!-- LIST -->
+<div id="listScreen">
+  <div class="list-header">
+    <div class="list-title">📋 Daftar Siswa</div>
+    <button class="icon-btn" onclick="hideList()">✕</button>
+  </div>
+  <div class="student-list" id="studentList"></div>
+</div>
+
+<!-- SUMMARY MODAL -->
+<div id="summaryModal" class="modal-overlay">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title">📊 Ringkasan Absensi</div>
+      <button class="icon-btn" onclick="closeSummary()">✕</button>
+    </div>
+    <div class="modal-body" id="summaryBody"></div>
+    <div class="modal-footer">
+      <button class="btn-primary" onclick="submitFromSummary()">Kirim Absensi</button>
+      <button class="btn-secondary" onclick="closeSummary()">Lanjutkan</button>
+    </div>
+  </div>
+</div>
+
+<!-- DAFTAR SISWA SCREEN -->
+<div id="daftarScreen" style="display:none;">
+  <div class="reg-header">
+    <button class="icon-btn" onclick="backToDashboardFromDaftar()">◀</button>
+    <div class="reg-title">Daftar Siswa di Ekskul</div>
+     </div>
+
+  <div class="daftar-top-bar">
+    <div class="daftar-count">
+      <span class="daftar-count-num" id="daftarStatTotal">0</span>
+      <span class="daftar-count-label">Jumlah siswa didalam kelas</span>
+    </div>
+    <div class="daftar-sort">
+  <select id="daftarSortSelect" class="sort-select" onchange="handleDaftarSort()">
+    <option value="hadir">Hadir</option>
+    <option value="alpha">Alpha</option>
+    <option value="terlambat">Terlambat</option>
+    <option value="pagi">Pagi</option>
+    <option value="kosong">Kosong</option>
+  </select>
+</div>
+  </div>
+
+  <div class="daftar-list-container" id="daftarList"></div>
+  <div class="empty-state" id="daftarEmpty" style="display:none;">
+    <div class="empty-state-icon">📭</div>
+    <div class="empty-state-text">Tidak ada siswa</div>
+  </div>
+</div>
+
+<!-- REMOVE CONFIRMATION MODAL -->
+<div id="removeModal" class="modal-overlay">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title">Keluarkan Siswa</div>
+      <button class="icon-btn" onclick="closeRemoveModal()">✕</button>
+    </div>
+    <div class="modal-body" style="text-align:center;padding:32px 20px;">
+      <div style="font-size:48px;margin-bottom:16px;">⚠️</div>
+      <div style="font-size:16px;font-weight:700;margin-bottom:8px;" id="removeStudentName">-</div>
+      <div style="font-size:13px;color:var(--text-secondary);margin-bottom:32px;">
+        Akan dikeluarkan dari ekskul ini. Siswa dapat mendaftar ekskul lain.
+      </div>
+            <!-- ADD THIS BLOCK -->
+      <div class="form-group" style="text-align:left;margin-top:20px;">
+        <label class="form-label">Alasan Pengeluaran (Wajib)</label>
+        <input type="text" id="removeReasonInput" class="form-input" placeholder="Contoh: Tidak aktif, melanggar peraturan..." autocomplete="off">
+      </div>
+      <!-- END ADD -->
+
+      <div class="remove-toggle-label">Geser untuk mengonfirmasi</div>
+      <div class="remove-toggle-track" id="removeToggleTrack">
+        <div class="remove-toggle-thumb">▶</div>
+      </div>
+      <input type="checkbox" id="removeToggle" style="display:none;">
+      
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeRemoveModal()">Batal</button>
+      <button class="btn-primary" id="removeConfirmBtn" onclick="confirmRemoveStudent()" disabled>Keluarkan</button>
+    </div>
+  </div>
+</div>
+
+<!-- STATUS -->
+<div class="status-overlay" id="statusOverlay" style="opacity:0;"></div>
+
+<!-- LOADING -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="loading-text">Memuat data...</div>
+</div>
+<!-- SEARCH OVERLAY -->
+<div id="searchOverlay" class="search-overlay">
+  <div class="search-sheet">
+    <div class="search-header">
+      <input type="text" id="searchInput" class="search-input" placeholder="Cari nama siswa..." oninput="handleSearch()">
+      <button class="icon-btn" onclick="closeSearch()">✕</button>
+    </div>
+    <div class="search-results" id="searchResults"></div>
+  </div>
+</div>  <!-- ← CLOSE SEARCH OVERLAY HERE -->
+
+<!-- ===== SYARAT KHUSUS SCREEN ===== -->
+<div id="syaratScreen" style="display:none;">
+  <div class="reg-header">
+    <button class="icon-btn" onclick="backToDashboardFromSyarat()">◀</button>
+    <div class="reg-title">Syarat Khusus</div>
+      </div>
+
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-label">TOTAL</div>
+      <div class="stat-value" id="syaratStatTotal">0</div>
+    </div>
+    <div class="stat-card stat-green">
+      <div class="stat-label">SUDAH</div>
+      <div class="stat-value" id="syaratStatDone">0</div>
+    </div>
+    <div class="stat-card stat-red">
+      <div class="stat-label">BELUM</div>
+      <div class="stat-value" id="syaratStatPending">0</div>
+    </div>
+  </div>
+
+  <div class="syarat-list-container" id="syaratList"></div>
+  
+  <div class="empty-state" id="syaratEmpty" style="display:none;">
+    <div class="empty-state-icon">📭</div>
+    <div class="empty-state-text">Tidak ada siswa</div>
+  </div>
+
+  <!-- Fixed bottom save bar -->
+  <div class="syarat-bottom-bar">
+    <div class="syarat-change-count" id="syaratChangeCount">0 perubahan</div>
+    <button class="btn-send-compact" id="syaratSaveBtn" onclick="submitSyaratChanges()" disabled>Simpan</button>
+  </div>
+</div>
+
+
+<!-- PENGajuan DANA MODAL -->
+<div id="danaModal" class="modal-overlay">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title">💰 Ajukan Dana</div>
+      <button class="icon-btn" onclick="closeDanaModal()">✕</button>
+    </div>
+    <div class="modal-body">
+  <div class="form-group">
+    <label class="form-label">ID Transaksi</label>
+    <input type="text" id="danaId" class="form-input" readonly>
+  </div>
+  <div class="form-group">
+    <label class="form-label">Deskripsi pengajuan</label>
+    <input type="text" id="danaNama" class="form-input" placeholder="Contoh: Latihan Futsal" autocomplete="off">
+  </div>
+  <div class="form-group">
+    <label class="form-label">Nominal</label>
+    <input type="text" id="danaJumlah" class="form-input" placeholder="Rp 0" autocomplete="off" oninput="formatDanaInput(this)">
+  </div>
+  <div class="dana-history-link" onclick="openDanaHistory()">📋 Lihat riwayat pengajuan →</div>
+</div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeDanaModal()">Batal</button>
+      <button class="btn-primary" id="danaKirimBtn" onclick="submitPengajuanDana()">Kirim</button>
+    </div>
+  </div>
+</div>
+<!-- DANA HISTORY SCREEN -->
+<div id="danaHistoryScreen" style="display:none;">
+  <div class="reg-header">
+    <button class="icon-btn" onclick="closeDanaHistory()">◀</button>
+    <div class="reg-title">Riwayat Pengajuan</div>
+    <div style="width:40px;"></div>
+  </div>
+
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-label">TOTAL</div>
+      <div class="stat-value" id="dhStatTotal">0</div>
+    </div>
+    <div class="stat-card stat-green">
+      <div class="stat-label">DISETUJUI</div>
+      <div class="stat-value" id="dhStatApproved">0</div>
+    </div>
+    <div class="stat-card stat-red">
+      <div class="stat-label">DITOLAK</div>
+      <div class="stat-value" id="dhStatRejected">0</div>
+    </div>
+  </div>
+
+  <div class="dana-history-list" id="danaHistoryList"></div>
+  
+  <div class="empty-state" id="danaHistoryEmpty" style="display:none;">
+    <div class="empty-state-icon">📭</div>
+    <div class="empty-state-text">Belum ada pengajuan</div>
+  </div>
+</div>
+<!-- DANA LOADING OVERLAY -->
+<div id="danaLoadingOverlay">
+  <div class="dana-loading-content">
+    <div class="spinner"></div>
+    <div class="dana-loading-text">Memuat pengajuan dana...</div>
+  </div>
+</div>
+<!-- FACE SCAN SCREEN -->
+<div id="faceScanScreen" style="display:none;">
+  <!-- Header -->
+  <div class="face-scan-header">
+    <button class="icon-btn" onclick="safeBackFromFaceScan()" title="Kembali">◀</button>
+    <div class="face-scan-title">📷 Face ID Absensi</div>
+    <button class="icon-btn" onclick="showFaceScanList()" title="Daftar">📋</button>
+  </div>
+
+  <!-- Stats Bar -->
+  <div class="face-stats-bar" id="faceStatsBar">
+    <div class="face-stat-card">
+      <div class="face-stat-label">TOTAL</div>
+      <div class="face-stat-value" id="faceStatTotal">0</div>
+    </div>
+    <div class="face-stat-card sheet">
+      <div class="face-stat-label">SUDAH ABSEN</div>
+      <div class="face-stat-value" id="faceStatSudahSheet">0</div>
+    </div>
+    <div class="face-stat-card scan">
+      <div class="face-stat-label">BARU SCAN</div>
+      <div class="face-stat-value" id="faceStatSudah">0</div>
+    </div>
+    <div class="face-stat-card belum">
+      <div class="face-stat-label">BELUM</div>
+      <div class="face-stat-value" id="faceStatBelum">0</div>
+    </div>
+  </div>
+
+  <!-- Camera Area -->
+  <div class="face-camera-area">
+    <video id="faceVideo" autoplay playsinline muted></video>
+    <canvas id="faceCanvas"></canvas>
+    <div class="face-scan-ribbon" id="faceScanRibbon"></div>
+    <button class="face-cam-switch" id="faceBtnSwitchCam" onclick="switchFaceCamera()" title="Ganti Kamera">🔄</button>
+    <div class="face-camera-hint">Arahkan wajah ke kamera</div>
+  </div>
+
+  <!-- Scanned List -->
+  <div class="face-scanned-area">
+    <div class="face-scanned-header">📋 Siswa Terdeteksi</div>
+    <div class="face-scanned-list" id="faceScannedList"></div>
+    <div class="face-scanned-empty" id="faceEmptyScanned" style="display:none;">
+      Belum ada siswa terdeteksi
+    </div>
+  </div>
+
+  <!-- Bottom Bar -->
+  <div class="face-bottom-bar">
+    <button class="face-btn-batal" id="faceBtnBatal" onclick="batalFaceScan()">Batal</button>
+    <button class="face-btn-simpan" id="faceBtnSimpan" onclick="submitFaceScans()">
+      💾 Simpan Absensi
+    </button>
+  </div>
+
+  <!-- Loading Overlay -->
+  <div id="faceLoadingOverlay">
+    <div class="spinner"></div>
+    <div class="face-loading-text" id="faceLoadingText">Memuat...</div>
+  </div>
+
+  <!-- DESKTOP VERIFICATION PANEL (student-facing) — MOVED OUTSIDE HEADER -->
+  <div class="verify-panel" id="verifyPanel">
+    <div class="verify-toggle-wrap">
+      <button class="verify-toggle active" id="verifyToggleList" onclick="setVerifyMode('list')">📋 List</button>
+      <button class="verify-toggle" id="verifyTogglePhoto" onclick="setVerifyMode('photo')">🖼️ Photo</button>
+    </div>
+    
+    <div class="verify-content" id="verifyContentList">
+      <div class="verify-panel-title">✅ Siswa Terdeteksi</div>
+      <div class="verify-list-large" id="verifyListLarge">
+        <div class="verify-empty"><div class="verify-empty-icon">📭</div><div>Belum ada siswa terdeteksi</div></div>
+      </div>
+    </div>
+    
+    <div class="verify-content" id="verifyContentPhoto" style="display:none;">
+      <div class="verify-panel-title">✅ Siswa Terdeteksi</div>
+      <div class="verify-photo-stage" id="verifyPhotoStage">
+        <div class="verify-photo-empty" id="verifyPhotoEmpty">
+          <div class="verify-empty-icon">👤</div>
+          <div class="verify-empty-text">Arahkan wajah ke kamera</div>
+        </div>
+        <div class="verify-photo-card" id="verifyPhotoCard" style="display:none;">
+          <div class="verify-photo-img-wrap">
+            <img class="verify-photo-img" id="verifyPhotoImg" src="" alt="">
+            <div class="verify-photo-fallback" id="verifyPhotoFallback">👤</div>
+          </div>
+          <div class="verify-photo-info">
+            <div class="verify-photo-name" id="verifyPhotoName">-</div>
+            <div class="verify-photo-class" id="verifyPhotoClass">-</div>
+            <div class="verify-photo-ekstra" id="verifyPhotoEkstra">-</div>
+            <div class="verify-photo-status" id="verifyPhotoStatus">HADIR</div>
+            <button class="verify-photo-remove" id="verifyPhotoRemove" onclick="removeCurrentVerifyPhoto()" style="display:none;">
+              <span>✕</span> Hapus (Mismatch)
+              </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== HELPER / PANITIA DASHBOARD ===== -->
+<div id="helperScreen" style="display:none;">
+  <div class="dashboard-header">
+    <div class="welcome-title">Mode Panitia</div>
+    <div class="teacher-name">Pengawas Absensi</div>
+    <div class="school-name">SMK Diponegoro Tumpang</div>
+  </div>
+  <div class="dashboard-grid helper-grid">
+      <div class="dash-btn" onclick="showLateRecord()">
+      <div class="dash-icon">⏱️</div>
+      <div class="dash-label">Catat Keterlambatan</div>
+      <div class="dash-desc">Pencatatan manual</div>
+    </div>
+    <div class="dash-btn logout" onclick="doLogout()">
+      <div class="dash-icon">🚪</div>
+      <div class="dash-label">Keluar</div>
+    </div>
+  </div>
+</div>
+<!-- ===== KETUA EKSKUL DASHBOARD ===== -->
+<div id="ketuaScreen" style="display:none;">
+  <div class="ketua-dashboard">
+    <div class="ketua-header">
+      <div class="ketua-badge">Ketua Ekskul</div>
+      <div class="ketua-title" id="ketuaEkskulName">-</div>
+      <div class="ketua-subtitle">SMK Diponegoro Tumpang</div>
+    </div>
+    
+    <div class="ketua-actions">
+      <button class="ketua-card" onclick="showKetuaAbsen()">
+        <div class="ketua-card-icon">📋</div>
+        <div class="ketua-card-body">
+          <div class="ketua-card-label">Absen Siswa</div>
+          <div class="ketua-card-desc">Catat kehadiran anggota ekskul</div>
+        </div>
+        <div class="ketua-card-arrow">›</div>
+      </button>
+      
+      <button class="ketua-card logout" onclick="doLogout()">
+        <div class="ketua-card-icon">🚪</div>
+        <div class="ketua-card-body">
+          <div class="ketua-card-label">Keluar</div>
+          <div class="ketua-card-desc">Kembali ke halaman login</div>
+        </div>
+        <div class="ketua-card-arrow">›</div>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- TATIB DASHBOARD -->
+<div id="tatibScreen" style="display:none;">
+  <div class="dashboard-header">
+    <div class="welcome-title">Panel Tata Tertib</div>
+    <div class="teacher-name" id="tatibName">-</div>
+    <div class="school-name">SMK Diponegoro Tumpang</div>
+  </div>
+  <div class="dashboard-grid">
+    <div class="dash-btn" onclick="showTatibPayment()">
+      <div class="dash-icon">💰</div>
+      <div class="dash-label">Pembayaran Denda</div>
+    </div>
+    <div class="dash-btn" onclick="showTatibBermasalah()">
+  <div class="dash-icon">🚨</div>
+  <div class="dash-label">Siswa Bermasalah</div>
+</div>
+    <div class="dash-btn logout" onclick="doLogout()">
+      <div class="dash-icon">🚪</div>
+      <div class="dash-label">Keluar</div>
+    </div>
+  </div>
+</div>
+
+<!-- TATIB PAYMENT SCREEN (Full Page List) -->
+<div id="tatibPaymentScreen" style="display:none;">
+  <div class="app-header">
+    <button class="icon-btn" onclick="backToTatib()">◀</button>
+    <div class="operator-info" style="flex:1; margin-left:12px;">
+      <div class="operator-name">Pembayaran Denda</div>
+      <div class="operator-ekstra">Daftar siswa berdenda</div>
+    </div>
+  </div>
+  
+  <div class="tatib-search-wrap">
+    <input type="text" id="tatibSearchInput" class="tatib-search-input" placeholder="Cari nama atau kelas..." oninput="onTatibSearchInput()" autocomplete="off">
+  </div>
+  
+  <div class="tatib-debt-list-container" id="tatibDebtListContainer"></div>
+  
+  <div class="empty-state" id="tatibDebtEmpty" style="display:none;">
+    <div class="empty-state-icon">📭</div>
+    <div class="empty-state-text">Tidak ada siswa dengan denda</div>
+  </div>
+</div>
+
+<!-- TATIB PAYMENT MODAL (Input Payment) -->
+<div id="tatibPaymentModal" class="modal-overlay">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title">💰 Input Pembayaran</div>
+      <button class="icon-btn" onclick="closeTatibPaymentModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="tatib-detail-header">
+        <div class="tatib-detail-name" id="tatibPayName">-</div>
+        <div class="tatib-detail-class" id="tatibPayClass">-</div>
+      </div>
+      
+      <div class="tatib-debt-cards">
+        <div class="tatib-debt-card">
+          <div class="tatib-debt-card-label">Total</div>
+          <div class="tatib-debt-card-value" id="tatibPayTotal">Rp 0</div>
+        </div>
+        <div class="tatib-debt-card">
+          <div class="tatib-debt-card-label">Sudah</div>
+          <div class="tatib-debt-card-value green" id="tatibPayPaid">Rp 0</div>
+        </div>
+        <div class="tatib-debt-card">
+          <div class="tatib-debt-card-label">Sisa</div>
+          <div class="tatib-debt-card-value red" id="tatibPaySisa">Rp 0</div>
+        </div>
+      </div>
+      
+      <div class="tatib-section-title">Riwayat Pembayaran</div>
+      <div class="tatib-history-list" id="tatibPayHistory"></div>
+      
+      <div class="form-group">
+        <label class="form-label">Jumlah Pembayaran</label>
+        <input type="text" id="tatibPayAmount" class="form-input" placeholder="Rp 0" oninput="formatTatibAmount(this)">
+        <div class="tatib-pay-hint" id="tatibPayHint">Maksimal: Rp 0</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeTatibPaymentModal()">Batal</button>
+      <button class="btn-primary" id="tatibPaySubmitBtn" onclick="submitTatibPayment()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- TATIB BERMASALAH SCREEN -->
+<div id="tatibBermasalahScreen" style="display:none;">
+  <div class="app-header">
+    <button class="icon-btn" onclick="backToTatib()">◀</button>
+    <div class="operator-info" style="flex:1; margin-left:12px;">
+      <div class="operator-name">Siswa Bermasalah</div>
+      <div class="operator-ekstra">Daftar siswa yang perlu ditindak</div>
+    </div>
+  </div>
+
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-label">TOTAL</div>
+      <div class="stat-value" id="tatibBmStatTotal">0</div>
+    </div>
+    <div class="stat-card stat-green">
+      <div class="stat-label">SUDAH</div>
+      <div class="stat-value" id="tatibBmStatDone">0</div>
+    </div>
+    <div class="stat-card stat-red">
+      <div class="stat-label">BELUM</div>
+      <div class="stat-value" id="tatibBmStatPending">0</div>
+    </div>
+  </div>
+
+  <div class="tatib-search-wrap">
+    <input type="text" id="tatibBmSearchInput" class="tatib-search-input" placeholder="Cari nama atau kelas..." oninput="onTatibBmSearch()" autocomplete="off">
+  </div>
+    <div class="tatib-bm-filters">
+    <button class="tatib-bm-filter active" onclick="setTatibBmFilter('all')">Semua</button>
+    <button class="tatib-bm-filter" onclick="setTatibBmFilter('tanpa')">Tanpa Ekstra</button>
+    <button class="tatib-bm-filter" onclick="setTatibBmFilter('alpha3')">Alpha ≥3</button>
+  </div>
+
+  <div class="tatib-debt-list-container" id="tatibBmListContainer"></div>
+  
+  <div class="empty-state" id="tatibBmEmpty" style="display:none;">
+    <div class="empty-state-icon">✅</div>
+    <div class="empty-state-text">Tidak ada siswa bermasalah</div>
+  </div>
+</div>
+
+<!-- ===== LATE RECORD SCREEN ===== -->
+<div id="lateRecordScreen" style="display:none;">
+  <div class="app-header">
+    <button class="icon-btn" onclick="backToHelper()">◀</button>
+    <div class="operator-info" style="flex:1; margin-left:12px;">
+      <div class="operator-name">Catat Keterlambatan</div>
+      <div class="operator-ekstra">Mode Panitia</div>
+    </div>
+  </div>
+
+  <div class="late-search-wrap">
+    <input type="text" id="lateSearchInput" class="late-search-input" placeholder="Cari nama siswa..." autocomplete="off">
+    <div class="late-predictive" id="latePredictive"></div>
+  </div>
+
+  <div class="late-selected-header">Siswa yang dipilih:</div>
+  <div class="late-selected-list" id="lateSelectedList"></div>
+
+  <div class="late-empty" id="lateEmpty" style="display:none;">
+    <div class="empty-state-icon">📝</div>
+    <div class="empty-state-text">Belum ada siswa dipilih</div>
+  </div>
+
+  <div class="late-bottom-bar">
+    <div class="late-countdown">
+  <div class="countdown-value" id="countdownValue">--:--:--</div>
+  <div class="countdown-label" id="countdownLabel">Jangan perbolehkan siswa telat masuk</div>
+</div>
+    <button class="btn-send-compact" id="lateSaveBtn" onclick="openLateConfirm()" disabled>Simpan Data</button>
+  </div>
+</div>
+
+<!-- ===== LATE CONFIRM MODAL ===== -->
+<div id="lateConfirmModal" class="modal-overlay">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title">Konfirmasi Keterlambatan</div>
+      <button class="icon-btn" onclick="closeLateConfirm()">✕</button>
+    </div>
+    <div class="modal-body" id="lateConfirmBody"></div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeLateConfirm()">Batal</button>
+      <button class="btn-primary" onclick="submitLateRecord()">Kirim</button>
+    </div>
+  </div>
+</div>
+<!-- BACK BLOCK MODAL -->
+<div id="backBlockModal" class="modal-overlay">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title">⚠️ Data Belum Tersimpan</div>
+    </div>
+    <div class="modal-body" style="text-align:center;">
+      <div style="font-size:48px;margin-bottom:12px;">📝</div>
+      <div style="font-size:15px;font-weight:600;margin-bottom:8px;color:var(--text);">
+        Ada <span id="backBlockCount">0</span> siswa yang belum dikirim
+      </div>
+      <div style="font-size:13px;color:var(--text-secondary);">
+        Jika keluar sekarang, data absensi akan hilang.
+      </div>
+    </div>
+    <div class="modal-footer" style="flex-direction:column;gap:8px;">
+      <button class="btn-primary" onclick="dismissBackBlock()" style="width:100%;">
+        Lanjutkan Absensi
+      </button>
+      <button class="btn-secondary" onclick="confirmBackBlock()" style="width:100%;background:transparent;color:var(--red);border:1px solid var(--red);">
+        Tinggalkan & Hapus Data
+      </button>
+    </div>
+  </div>
+</div>
+<!-- TANPA EKSTRA MODAL -->
+<div id="tanpaEkstraModal" class="modal-overlay">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title">Siswa tanpa Ekskul</div>
+      <button class="icon-btn" onclick="closeTanpaEkstraModal()">✕</button>
+    </div>
+    <div class="modal-body" style="padding:0;max-height:60vh;">
+      <div class="tanpa-ekstra-list" id="tanpaEkstraList"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeTanpaEkstraModal()">Tutup</button>
+    </div>
+  </div>
+</div>
+
+<!-- EXPEL CONFIRM MODAL -->
+<div id="expelModal" class="modal-overlay">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title">Keluarkan Siswa</div>
+      <button class="icon-btn" onclick="closeExpelModal()">✕</button>
+    </div>
+    <div class="modal-body" style="text-align:center;padding:32px 20px;">
+      <div style="font-size:48px;margin-bottom:16px;">⚠️</div>
+      <div style="font-size:16px;font-weight:700;margin-bottom:4px;" id="expelStudentName">-</div>
+      <div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;" id="expelStudentMeta">-</div>
+      <div style="font-size:13px;color:var(--red);font-weight:600;margin-bottom:24px;" id="expelAlphaCount">-</div>
+      
+      <div class="form-group" style="text-align:left;">
+        <label class="form-label">Alasan Pengeluaran (Wajib)</label>
+        <input type="text" id="expelReasonInput" class="form-input" placeholder="Contoh: Terlalu banyak alpha, melanggar peraturan..." autocomplete="off">
+      </div>
+    </div>
+    <div class="modal-footer" style="flex-direction:column;gap:8px;">
+      <button class="btn-primary" style="width:100%;" id="expelConfirmBtn" onclick="confirmExpelStudent()" disabled>Keluarkan</button>
+      <button class="btn-secondary" style="width:100%;background:transparent;" onclick="closeExpelModal()">Batal</button>
+    </div>
+  </div>
+</div>
+<!-- KETUA LOGIN MODAL -->
+<div id="ketuaLoginModal" class="modal-overlay">
+  <div class="modal-sheet" style="max-width:320px;">
+    <div class="modal-header">
+      <div class="modal-title">🔑 Login Ketua</div>
+      <button class="icon-btn" onclick="closeKetuaLogin()">✕</button>
+    </div>
+    <div class="modal-body" style="padding:20px;display:flex;flex-direction:column;align-items:center;">
+      <div id="ketuaCodeDisplay" style="width:100%;padding:14px;border-radius:14px;background:var(--bg);border:1px solid var(--border);font-size:32px;font-weight:800;text-align:center;letter-spacing:10px;color:var(--text);margin-bottom:20px;font-variant-numeric:tabular-nums;">----</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;width:100%;margin-bottom:16px;">
+        <button class="numpad-btn" onclick="ketuaNumpad('1')">1</button>
+        <button class="numpad-btn" onclick="ketuaNumpad('2')">2</button>
+        <button class="numpad-btn" onclick="ketuaNumpad('3')">3</button>
+        <button class="numpad-btn" onclick="ketuaNumpad('4')">4</button>
+        <button class="numpad-btn" onclick="ketuaNumpad('5')">5</button>
+        <button class="numpad-btn" onclick="ketuaNumpad('6')">6</button>
+        <button class="numpad-btn" onclick="ketuaNumpad('7')">7</button>
+        <button class="numpad-btn" onclick="ketuaNumpad('8')">8</button>
+        <button class="numpad-btn" onclick="ketuaNumpad('9')">9</button>
+        <button class="numpad-btn" onclick="ketuaNumpad('C')" style="color:var(--red);">C</button>
+        <button class="numpad-btn" onclick="ketuaNumpad('0')">0</button>
+        <button class="numpad-btn" onclick="ketuaNumpad('DEL')" style="color:var(--yellow);">⌫</button>
+      </div>
+      <button class="btn-primary" style="width:100%;" onclick="doKetuaLogin()">Masuk</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCRIPTS -->
+<script src="main.js"></script>
+<script src="utils.js"></script>
+<script src="reel.js"></script>
+<script src="registration.js"></script>
+<script src="daftar.js"></script>
+<script src="syarat.js"></script>
+<script src="dana.js"></script>
+<script src="facescan.js"></script>
+<script src="helper.js"></script>
+<script src="admin.js"></script>
+<script src="tatib.js"></script>
+<script src="overseer.js"></script>
+
+
+</body>
+</html>
