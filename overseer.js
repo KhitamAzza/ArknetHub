@@ -38,7 +38,6 @@ function toggleAlphaCard() {
   renderOverseerAlpha();
 }
 
-// ===== SECTION 1: DAILY ATTENDANCE =====
 async function loadOverseerDates() {
   showLoading(true);
   try {
@@ -50,16 +49,18 @@ async function loadOverseerDates() {
     if (error) throw error;
 
     const uniqueDates = [...new Set((data || []).map(d => d.date))];
+
+    // Ensure today is always available even if no attendance has been recorded yet
+    const today = getJakartaDateString();
+    if (!uniqueDates.includes(today)) {
+      uniqueDates.push(today);
+    }
+
     uniqueDates.sort((a, b) => parseIndonesianDate(b) - parseIndonesianDate(a));
 
     overseerDates = uniqueDates;
-
-    if (uniqueDates.length > 0) {
-      overseerSelectedDate = uniqueDates[0];
-      await loadOverseerStats(overseerSelectedDate);
-    } else {
-      renderOverseerEmpty();
-    }
+    overseerSelectedDate = uniqueDates[0]; // defaults to today (or most recent)
+    await loadOverseerStats(overseerSelectedDate);
   } catch (err) {
     console.error(err);
     showStatus("Gagal memuat data", "error");
@@ -67,7 +68,6 @@ async function loadOverseerDates() {
   }
   showLoading(false);
 }
-
 async function loadOverseerStats(date) {
   showLoading(true);
   try {
