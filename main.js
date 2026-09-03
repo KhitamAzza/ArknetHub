@@ -19,7 +19,7 @@ const OPERATORS = {
   "azkiahasna": { name: "Chusnul Khitam Azza", ekstra: "MASTER", isMaster: true },
   "devkoord1": { name: "Hernanda", ekstra: "MASTER", isMaster: true },
   "tatib1": { name: "Syamsul Arif", ekstra: "TATIB", isTatib: true },      // ← ADD
-  "tatib2": { name: "Siti Munawaroh", ekstra: "TATIB", isTatib: true },    // ← ADD
+  "tatib2": { name: "Masduki Zen", ekstra: "TATIB", isTatib: true },    // ← ADD
   "eksesport": { name: "Masduki Zen", ekstra: "E-Sport" },
   "eksfutsal": { name: "Rizky", ekstra: "Futsal" },
   "ekspakbola": { name: "Rico Yoga", ekstra: "Sepakbola" },
@@ -94,16 +94,18 @@ const regDashBtn = document.getElementById("regDashBtn");
 
 // ===== GLOBAL SCREEN HIDER =====
 function hideAllScreens() {
-  const ids = [
-  "loginScreen", "dashboardScreen", "mainApp", "listScreen",
-  "absenMenuScreen", "registrationScreen", "summaryModal",
-  "adminScreen", "helperScreen", "overseerScreen",
-  "fixerScreen", "configScreen", "lateRecordScreen",
-  "faceScanScreen", "danaHistoryScreen", "syaratScreen",
-  "daftarScreen", "searchOverlay", "ketuaScreen",
-  "tatibScreen", "tatibPaymentScreen", "tatibHeatmapScreen",
-  "kelolaSiswaScreen", "tanpaEkstraModal","expelModal"   // ← ADD THIS
-];
+    const ids = [
+    "loginScreen", "dashboardScreen", "mainApp", "listScreen",
+    "absenMenuScreen", "registrationScreen", "summaryModal",
+    "adminScreen", "helperScreen", "overseerScreen",
+    "fixerScreen", "configScreen", "lateRecordScreen",
+    "faceScanScreen", "danaHistoryScreen", "syaratScreen",
+    "daftarScreen", "searchOverlay", "ketuaScreen",
+    "tatibScreen", "tatibPaymentScreen", "tatibHeatmapScreen",
+    "kelolaSiswaScreen", "tanpaEkstraModal", "expelModal",
+    "paperScreen", "adminInputScreen", "proofViewerScreen",
+    "kelolaAbsensiScreen", "printAbsensiScreen"
+  ];
   ids.forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = "none";
@@ -247,33 +249,7 @@ function showAdminScreen() {
 }
 
 function backToAdmin() {
-//   hideAllScreens();
   showAdminScreen();
-}
-
-function backToAbsenMenu() {
-  mainApp.style.display = "none";
-  listScreen.style.display = "none";
-  summaryModal.classList.remove("visible");
-  closeSearch();
-  if (isHelper) {
-    showHelperScreen();
-  } else if (isMaster) {
-    showAdminScreen();
-  } else if (currentOperator && currentOperator.startsWith("Ketua ")) {
-    showKetuaDashboard();
-  } else {
-    absenMenuScreen.style.display = "flex";
-  }
-  currentMode = null;
-}
-
-function showAdminAbsen() {
-  hideAllScreens();
-  currentMode = 'REEL';
-  isMaster = true;
-  currentEkstra = "MASTER";
-  if (absenMenuScreen) absenMenuScreen.style.display = "flex";
 }
 
 // ===== FIXER MODE (placeholder nav) =====
@@ -295,12 +271,7 @@ function showConfigMenu() {
   }
 }
 
-function showOverseerView() {
-  // Placeholder — overseer disabled for maintenance
-}
-
 function doLogout() {
-  // Reset ALL state
   currentOperator = null;
   currentEkstra = null;
   isMaster = false;
@@ -312,17 +283,17 @@ function doLogout() {
   currentIndex = 0;
   markedStudents.clear();
   sheetStatus.clear();
+  paperStudents = [];
+  paperCapturedImage = null;
+  stopPaperCamera();
   currentPeriod = null;
   appBundle = null;
   bundlePromise = null;
 
-  // Reset fixer/admin state if exists
   if (typeof helperLateStudents !== 'undefined') helperLateStudents = [];
   if (typeof fixerSelectedStudent !== 'undefined') fixerSelectedStudent = null;
   if (typeof configChanges !== 'undefined') configChanges = {};
 
-  // Hide everything, show login
-  closeKetuaLogin(); // ensure modal is closed on logout
   hideAllScreens();
   loginScreen.style.display = "flex";
   passwordInput.value = "";
@@ -330,78 +301,6 @@ function doLogout() {
 }
 // ===== KETUA LOGIN (Calculator) =====
 let ketuaCodeBuffer = "";
-
-function showKetuaLogin() {
-  ketuaCodeBuffer = "";
-  updateKetuaDisplay();
-  const modal = document.getElementById("ketuaLoginModal");
-  if (modal) modal.classList.add("visible");
-}
-
-function closeKetuaLogin() {
-  const modal = document.getElementById("ketuaLoginModal");
-  if (modal) modal.classList.remove("visible");
-  ketuaCodeBuffer = "";
-}
-
-function ketuaNumpad(key) {
-  if (key === 'C') {
-    ketuaCodeBuffer = "";
-  } else if (key === 'DEL') {
-    ketuaCodeBuffer = ketuaCodeBuffer.slice(0, -1);
-  } else if (ketuaCodeBuffer.length < 4 && /^\d$/.test(key)) {
-    ketuaCodeBuffer += key;
-  }
-  updateKetuaDisplay();
-}
-
-function updateKetuaDisplay() {
-  const el = document.getElementById("ketuaCodeDisplay");
-  if (el) {
-    el.textContent = ketuaCodeBuffer.padEnd(4, '-');
-    el.style.color = ketuaCodeBuffer.length === 4 ? 'var(--accent)' : 'var(--text)';
-  }
-}
-
-async function doKetuaLogin() {
-  if (ketuaCodeBuffer.length !== 4) {
-    showStatus("Masukkan 4 digit kode", "error");
-    return;
-  }
-
-  showLoading(true);
-  try {
-    const { data: ketuaData, error: ketuaError } = await sb
-      .from('Ketua')
-      .select('ekstra')
-      .eq('password', ketuaCodeBuffer)
-      .maybeSingle();
-
-    if (ketuaError) throw ketuaError;
-
-    if (!ketuaData) {
-      showLoading(false);
-      showStatus("Kode tidak ditemukan", "error");
-      ketuaCodeBuffer = "";
-      updateKetuaDisplay();
-      return;
-    }
-
-    closeKetuaLogin();
-    isHelper = false;
-    isMaster = false;
-    isTatib = false;
-    currentOperator = "Ketua " + ketuaData.ekstra;
-    currentEkstra = ketuaData.ekstra;
-    loginError.style.display = "none";
-    showKetuaDashboard();
-  } catch (e) {
-    showLoading(false);
-    showStatus("Error koneksi", "error");
-    console.error("Ketua login failed", e);
-  }
-  showLoading(false);
-}
 
 // ===== BUNDLE LOADER =====
 async function loadBundle(force = false) {
@@ -413,101 +312,47 @@ async function loadBundle(force = false) {
   if (!isMaster && !ekstraParam) return null;
 
   showLoading(true);
-  
   bundlePromise = (async () => {
     try {
-      // 1. Load config from Supabase (time rules, threshold, etc.)
+      // 1. Load config (keep for upload window & other settings, ignore time periods)
       const cfg = await loadSupabaseConfig();
-      
-      // 2. Determine current period from Jakarta time using config
-      const now = new Date();
-      const jakartaHour = parseInt(new Intl.DateTimeFormat('en-US', {
-        timeZone: 'Asia/Jakarta',
-        hour: 'numeric',
-        hour12: false
-      }).format(now));
-      const jakartaMinute = parseInt(new Intl.DateTimeFormat('en-US', {
-        timeZone: 'Asia/Jakarta',
-        minute: 'numeric'
-      }).format(now));
-      const timeValue = jakartaHour + (jakartaMinute / 100);
 
-      const period = {
-        isPagi: timeValue >= cfg.pagiStart && timeValue < cfg.pagiEnd,
-        isEkstra: timeValue >= cfg.ekstraStart && timeValue < cfg.ekstraEnd,
-        isOutside: !(timeValue >= cfg.pagiStart && timeValue < cfg.pagiEnd) && 
-                   !(timeValue >= cfg.ekstraStart && timeValue < cfg.ekstraEnd)
-      };
-
-      // 3. Get students from Database table
+      // 2. Load students
       let query = sb.from('Database').select('id, nama, kelas, ekstra, photo_url');
-      if (!isMaster) {
-        query = query.eq('ekstra', ekstraParam);
-      }
-      const { data: students, error: studentError } = await query;
-      if (studentError) throw studentError;
+      if (!isMaster) query = query.eq('ekstra', ekstraParam);
+      const { data: students, error: sErr } = await query;
+      if (sErr) throw sErr;
 
-            // 4. Get today's attendance for current semester
-      const { data: attendance, error: attError } = await sb
-        .from('Attendance')
-        .select('student_id, status, period')
+      // 3. Load today's attendance from AttendanceV2
+      const { data: attendance, error: aErr } = await sb
+        .from('AttendanceV2')
+        .select('student_id, status')
         .eq('date', today)
         .eq('semester', currentSemester);
-      if (attError) throw attError;
+      if (aErr) throw aErr;
 
-      // 5. Group by student and derive effective status
-      const attByStudent = {};
-      (attendance || []).forEach(a => {
-        if (!attByStudent[a.student_id]) attByStudent[a.student_id] = [];
-        attByStudent[a.student_id].push(a);
-      });
+      const attMap = {};
+      (attendance || []).forEach(a => { attMap[a.student_id] = a.status; });
 
-            const deriveStatus = (rows) => {
-        if (!rows || rows.length === 0) return null;
-
-        const hasTelat = rows.some(r => r.status && r.status.trim().toUpperCase() === 'TELAT');
-        const hasEkstra = rows.some(r => r.period === 'EKSTRA');
-
-        if (hasTelat && hasEkstra) {
-          const ekstraExplicit = rows.find(r => r.period === 'EKSTRA' && r.status && r.status.trim() !== '');
-          if (ekstraExplicit) return ekstraExplicit.status.trim().toUpperCase();
-          return 'TERLAMBAT';
-        }
-        if (hasTelat) return 'TELAT';
-
-        const explicit = rows.find(r => r.status && r.status.trim() !== '');
-        if (explicit) return explicit.status.trim().toUpperCase();
-
-        const hasPagi = rows.some(r => r.period === 'PAGI');
-        if (hasPagi && hasEkstra) return 'HADIR';
-        if (hasPagi) return 'PAGI';
-        if (hasEkstra) return 'TERLAMBAT';
-        return null;
-      };
-
-      const mergedStudents = (students || []).map(s => ({
+      const merged = (students || []).map(s => ({
         id: s.id,
         nama: s.nama,
         kelas: s.kelas,
         ekstra: s.ekstra,
         foto: s.photo_url,
-        status: deriveStatus(attByStudent[s.id])
+        status: attMap[s.id] || null
       }));
 
       const result = {
         status: "ok",
-        period: period,
-        students: mergedStudents,
-        pendingRegistrations: [] // Not in Supabase yet
+        students: merged,
+        pendingRegistrations: []
       };
 
       appBundle = result;
-      currentPeriod = period;
-      totalStudents = mergedStudents;
+      totalStudents = merged;
       sheetStatus.clear();
-      mergedStudents.forEach(s => {
-        if (s.status) sheetStatus.set(s.id, s.status);
-      });
+      merged.forEach(s => { if (s.status) sheetStatus.set(s.id, s.status); });
 
       return result;
     } catch (err) {
@@ -526,22 +371,6 @@ function clearBundle() {
   appBundle = null;
 }
 
-function showKetuaDashboard() {
-  hideAllScreens();
-  const el = document.getElementById("ketuaScreen");
-  if (el) {
-    el.style.display = "flex";
-    const nameEl = document.getElementById("ketuaEkskulName");
-    if (nameEl) nameEl.textContent = currentEkstra;
-  }
-}
-
-function showKetuaAbsen() {
-  currentMode = 'REEL';
-  hideAllScreens();
-  const el = document.getElementById("absenMenuScreen");
-  if (el) el.style.display = "flex";
-}
 // ===== NAVIGATION =====
 function showDashboard() {
   hideAllScreens();
@@ -553,8 +382,7 @@ function showAdminScreen() {
   const el = document.getElementById("adminScreen");
   if (el) {
     el.style.display = "flex";
-    const nameEl = document.getElementById("adminTeacherName");
-    if (nameEl) nameEl.textContent = currentOperator || "Admin";
+    document.getElementById("adminTeacherName").textContent = currentOperator || "Admin";
   }
 }
 
@@ -572,42 +400,28 @@ function backToHelper() {
   showHelperScreen();
 }
 
-function showAbsenMenu() {
-  dashboardScreen.style.display = "none";
-  absenMenuScreen.style.display = "flex";
-}
-
 function backToDashboard() {
-  mainApp.style.display = "none";
-  absenMenuScreen.style.display = "none";
-  registrationScreen.style.display = "none";
-  listScreen.style.display = "none";
+  hideAllScreens();
   if (isHelper) {
     showHelperScreen();
   } else if (isMaster) {
     showAdminScreen();
-  } else if (currentOperator && currentOperator.startsWith("Ketua ")) {
-    showKetuaDashboard();
   } else {
     showDashboard();
   }
   updateRegBadge();
 }
 
-function showReelAttendance() {
-  currentMode = 'REEL';
-  absenMenuScreen.style.display = "none";
-  mainApp.style.display = "flex";
-  activateBackGuard('reel');   // ← ADD THIS
-  activateBackTrap('reel');
-  loadStudents();
+function backToAbsenMenu() {
+  hideAllScreens();
+  if (isHelper) showHelperScreen();
+  else if (isMaster) showAdminScreen();
+  else showDashboard();
 }
 
-// AFTER
-function showFaceID() {
-  showStatus("Fitur ini belum tersedia", "info");
+function safeBackToAbsenMenu() {
+  backToAbsenMenu();
 }
-
 // ===== DATE =====
 function getJakartaDateString() {
   const fmt = new Intl.DateTimeFormat("en-US", {
@@ -622,15 +436,6 @@ function getJakartaDateString() {
   const monthNum = parseInt(parts.month, 10) - 1;
   const year = parts.year;
   return day + " " + BULAN_ID[monthNum] + " " + year;
-}
-function filterForReel(students) {
-  return students.filter(s => {
-    const status = (s.status || "").trim().toUpperCase();
-    if (!status) return true;
-    if (currentPeriod?.isPagi) return !["PAGI", "HADIR", "TERLAMBAT", "TELAT"].includes(status);
-    if (currentPeriod?.isEkstra) return !["HADIR", "TERLAMBAT"].includes(status);
-    return true;
-  });
 }
 // ===== DATA LOAD =====
 async function loadStudents() {
@@ -806,142 +611,7 @@ async function updateRegBadge() {
 function showDaftarSiswa() {
   // Implemented in daftar.js
 }
-// Config from Supabase not yet set up — helper hint disabled for now
-/* ============================================
-   BACK BUTTON FAILSAFE
-   Blocks hardware back & on-screen back
-   when unsent attendance data exists
-   ============================================ */
 
-let backGuardScreen = null;
-let backBlockScreen = null;
-
-function hasUnsentData() {
-  if (typeof markedStudents !== 'undefined' && markedStudents.size > 0) return true;
-  if (typeof faceUnsentQueue !== 'undefined' && faceUnsentQueue.length > 0) return true;
-  return false;
-}
-
-function activateBackGuard(screen) {
-  backGuardScreen = screen;
-  history.pushState({screen: screen}, '');
-}
-
-function showBackBlockModal(screen) {
-  backBlockScreen = screen;
-  const countEl = document.getElementById('backBlockCount');
-  if (countEl) {
-    let count = 0;
-    if (screen === 'reel' && typeof markedStudents !== 'undefined') count = markedStudents.size;
-    if (screen === 'face' && typeof faceUnsentQueue !== 'undefined') count = faceUnsentQueue.length;
-    countEl.textContent = count;
-  }
-  const modal = document.getElementById('backBlockModal');
-  if (modal) modal.classList.add('visible');
-}
-
-function dismissBackBlock() {
-  const modal = document.getElementById('backBlockModal');
-  if (modal) modal.classList.remove('visible');
-  if (backBlockScreen) {
-    activateBackGuard(backBlockScreen);
-  }
-  backBlockScreen = null;
-}
-
-function confirmBackBlock() {
-  const modal = document.getElementById('backBlockModal');
-  if (modal) modal.classList.remove('visible');
-  
-  backGuardScreen = null; // disarm
-  
-  if (backBlockScreen === 'reel') {
-    if (typeof markedStudents !== 'undefined') markedStudents.clear();
-    backToAbsenMenu();
-  } else if (backBlockScreen === 'face') {
-    if (typeof faceScanned !== 'undefined') faceScanned.clear();
-    if (typeof faceUnsentQueue !== 'undefined') faceUnsentQueue = [];
-    backFromFaceScan();
-  }
-  backBlockScreen = null;
-}
-
-// Safe wrappers for on-screen back buttons
-function safeBackToAbsenMenu() {
-  if (mainApp.style.display !== 'none' && hasUnsentData()) {
-    showBackBlockModal('reel');
-    return;
-  }
-  backGuardScreen = null;
-  backToAbsenMenu();
-}
-
-function safeBackFromFaceScan() {
-  const faceScreen = document.getElementById('faceScanScreen');
-  if (faceScreen && faceScreen.style.display !== 'none' && hasUnsentData()) {
-    showBackBlockModal('face');
-    return;
-  }
-  backGuardScreen = null;
-  backFromFaceScan();
-}
-
-// Hardware back button interceptor
-window.addEventListener('popstate', (e) => {
-  const screen = e.state?.screen;
-  if (!screen || screen !== backGuardScreen) return;
-
-  if (hasUnsentData()) {
-    showBackBlockModal(screen);
-    activateBackGuard(screen);
-  } else {
-    backGuardScreen = null;
-    if (screen === 'reel') backToAbsenMenu();
-    else if (screen === 'face') backFromFaceScan();
-  }
-});
-
-// Refresh / close tab warning
-window.addEventListener('beforeunload', (e) => {
-  if (hasUnsentData()) {
-    e.preventDefault();
-    e.returnValue = '';
-  }
-});
-/* ============================================
-   PHONE BACK BUTTON FAILSAFE
-   ============================================ */
-
-let backTrapActive = false;
-
-function activateBackTrap(screenName) {
-  backTrapActive = true;
-  // Push a dummy state so the next back press fires popstate
-  history.pushState({ guard: screenName }, "", location.href);
-}
-
-function deactivateBackTrap() {
-  backTrapActive = false;
-}
-
-// Hardware back button interceptor (Android)
-window.addEventListener("popstate", (e) => {
-  if (!backTrapActive) return;
-
-  const hasData = (typeof markedStudents !== 'undefined' && markedStudents.size > 0) ||
-                  (typeof faceUnsentQueue !== 'undefined' && faceUnsentQueue.length > 0);
-
-  if (hasData) {
-    // Re-trap immediately so the next back press is caught again
-    history.pushState({ guard: true }, "", location.href);
-    showBackBlockModal(e.state?.guard || 'reel');
-  } else {
-    deactivateBackTrap();
-    // Let it go back normally
-    history.back();
-  }
-});
-// Replace getDefaultConfig() and the old fetchJsonWithRetry(API_URL + "?action=getConfig")
 async function loadSupabaseConfig() {
     const { data, error } = await sb.from('Config').select('*').single();
     if (error || !data) return getDefaultConfig();

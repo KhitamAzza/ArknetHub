@@ -51,8 +51,8 @@ async function loadDaftarStudents() {
     let attendanceMap = {};
     if (studentList.length > 0) {
       const studentIds = studentList.map(s => s.id);
-      const { data: attendance, error: attError } = await sb
-        .from('Attendance')
+            const { data: attendance, error: attError } = await sb
+        .from('AttendanceV2')
         .select('student_id, date, status')
         .in('student_id', studentIds)
         .order('date', { ascending: false });

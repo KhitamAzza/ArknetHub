@@ -42,7 +42,7 @@ async function loadOverseerDates() {
   showLoading(true);
   try {
     const { data, error } = await sb
-      .from('Attendance')
+      .from('AttendanceV2')
       .select('date')
       .eq('semester', currentSemester);
 
@@ -50,7 +50,7 @@ async function loadOverseerDates() {
 
     const uniqueDates = [...new Set((data || []).map(d => d.date))];
 
-    // Ensure today is always available even if no attendance has been recorded yet
+    // Ensure today is always available even if no AttendanceV2 has been recorded yet
     const today = getJakartaDateString();
     if (!uniqueDates.includes(today)) {
       uniqueDates.push(today);
@@ -72,7 +72,7 @@ async function loadOverseerStats(date) {
   showLoading(true);
   try {
     const { data, error } = await sb
-      .from('Attendance')
+      .from('AttendanceV2')
       .select('status')
       .eq('semester', currentSemester)
       .eq('date', date);
@@ -197,11 +197,11 @@ async function loadOverseerAlpha() {
   if (container) container.innerHTML = '<div class="overseer-empty">Memuat...</div>';
 
   try {
-    const { data: alphaRows, error: alphaErr } = await sb
-      .from('Attendance')
-      .select('student_id')
-      .eq('semester', currentSemester)
-      .eq('status', 'ALPHA');
+      const { data: alphaRows, error: alphaErr } = await sb
+    .from('AttendanceV2')  // was Attendance
+    .select('student_id')
+    .eq('semester', currentSemester)
+    .eq('status', 'ALPHA');
 
     if (alphaErr) throw alphaErr;
 
@@ -479,16 +479,16 @@ async function selectWaReportDate(date) {
       .select('id, nama, kelas');
     if (studErr) throw studErr;
 
-    // 2. Attendance for selected date
+        // 2. AttendanceV2 for selected date
     const { data: attendance, error: attErr } = await sb
-      .from('Attendance')
+      .from('AttendanceV2')          // ← KEEP the V2! This is the table name.
       .select('student_id, status')
       .eq('date', date)
       .eq('semester', currentSemester);
     if (attErr) throw attErr;
 
     const attMap = {};
-    (attendance || []).forEach(a => {
+    (attendance || []).forEach(a => {   // ← lowercase `attendance` (the variable)
       attMap[a.student_id] = (a.status || '').trim().toUpperCase();
     });
 

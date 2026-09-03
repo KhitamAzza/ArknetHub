@@ -94,11 +94,11 @@ async function fetchTatibDebtData() {
     .select('id, nama, kelas, ekstra, photo_url');
   if (sErr) throw new Error("Gagal memuat database: " + sErr.message);
 
-  const { data: violations, error: vErr } = await sb
-    .from('Attendance')
+    const { data: violations, error: vErr } = await sb
+    .from('AttendanceV2')  // was Attendance
     .select('student_id, status')
     .eq('semester', currentSemester)
-    .in('status', ['ALPHA', 'TERLAMBAT', 'TELAT', 'PAGI']);
+    .in('status', ['ALPHA', 'TERLAMBAT', 'TELAT']);
   if (vErr) throw new Error("Gagal memuat pelanggaran: " + vErr.message);
 
   const { data: payments, error: pErr } = await sb
@@ -454,10 +454,10 @@ async function fetchTatibBermasalahData() {
   if (sErr) throw sErr;
 
   const { data: alphaRows, error: aErr } = await sb
-    .from('Attendance')
-    .select('student_id')
-    .eq('semester', currentSemester)
-    .eq('status', 'ALPHA');
+  .from('AttendanceV2')
+  .select('student_id')
+  .eq('semester', currentSemester)
+  .eq('status', 'ALPHA');
   if (aErr) throw aErr;
 
   const alphaCounts = {};

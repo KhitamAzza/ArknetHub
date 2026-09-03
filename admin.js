@@ -87,27 +87,8 @@ function highlightMatchFixer(text, query) {
 /* Derive effective status from multiple rows per date */
 function deriveFixerStatus(rows) {
   if (!rows || rows.length === 0) return 'KOSONG';
-
-  const hasTelat = rows.some(r => r.status && r.status.trim().toUpperCase() === 'TELAT');
-  const hasEkstra = rows.some(r => r.period === 'EKSTRA');
-
-  if (hasTelat && hasEkstra) {
-    const ekstraExplicit = rows.find(r => r.period === 'EKSTRA' && r.status && r.status.trim() !== '');
-    if (ekstraExplicit) return ekstraExplicit.status.trim().toUpperCase();
-    return 'TERLAMBAT';
-  }
-  if (hasTelat) return 'TELAT';
-
-  const explicit = rows.find(r => r.status && r.status.trim() !== '');
-  if (explicit) return explicit.status.trim().toUpperCase();
-
-  const hasPagi = rows.some(r => r.period === 'PAGI');
-  if (hasPagi && hasEkstra) return 'HADIR';
-  if (hasPagi) return 'PAGI';
-  if (hasEkstra) return 'TERLAMBAT';
-  return 'KOSONG';
+  return (rows[0].status || 'KOSONG').trim().toUpperCase();
 }
-
 async function selectFixerStudent(nama) {
   showLoading(true);
   try {
@@ -127,11 +108,11 @@ async function selectFixerStudent(nama) {
     const student = students[0];
     
         const { data: attendance, error: attError } = await sb
-      .from('Attendance')
-      .select('id, date, status, period')
-      .eq('student_id', student.id)
-      .eq('semester', currentSemester)
-      .order('date', { ascending: false });
+  .from('AttendanceV2')
+  .select('date, status')
+  .eq('student_id', student.id)
+  .eq('semester', currentSemester)
+  .order('date', { ascending: false });
     
     if (attError) throw attError;
 
@@ -142,17 +123,16 @@ async function selectFixerStudent(nama) {
       byDate[a.date].push(a);
     });
 
-    fixerSelectedStudent = {
+        fixerSelectedStudent = {
       id: student.id,
       nama: student.nama,
       kelas: student.kelas,
       ekstra: student.ekstra,
       foto: student.photo_url,
-      // One entry per date with derived status
-      attendance: Object.entries(byDate).map(([date, rows]) => ({
-        date: date,
-        status: deriveFixerStatus(rows),
-        _rowIds: rows.map(r => r.id) // keep IDs for editing
+      attendance: (attendance || []).map(a => ({
+        date: a.date,
+        status: (a.status || 'KOSONG').trim().toUpperCase(),
+        _rowIds: [a.id] // single row id
       }))
     };
     
@@ -343,22 +323,21 @@ async function saveFixerEdit() {
     if (targetRowIds.length > 0) {
       // ── UPDATE existing rows ──
       const { error } = await sb
-        .from('Attendance')
-        .update({ status: newStatus })
-        .in('id', targetRowIds);
+  .from('AttendanceV2')
+  .update({ status: newStatus })
+  .in('id', targetRowIds);
 
       if (error) throw error;
     } else {
       // ── INSERT new date (today only) ──
       const { error } = await sb
-        .from('Attendance')
-        .insert({
-          student_id: targetStudentId,   // ← was bugged: fixerEditTarget.studentId
-          date: targetDate,
-          period: 'EKSTRA',
-          semester: currentSemester,
-          status: newStatus
-        });
+  .from('AttendanceV2')
+  .insert({
+    student_id: targetStudentId,
+    date: targetDate,
+    semester: currentSemester,
+    status: newStatus
+  });
 
       if (error) throw error;
     }
@@ -388,12 +367,10 @@ let configActiveTab = 'config';
 
 // Map UI camelCase keys ↔ DB snake_case columns
 const CONFIG_DB_MAP = {
-  threshold: 'threshold',
+  allowAppCamera: 'allow_app_camera',
   validate: 'validate',
-  pagiStart: 'pagi_start',
-  pagiEnd: 'pagi_end',
-  ekstraStart: 'ekstra_start',
-  ekstraEnd: 'ekstra_end',
+  mulaiPengumpulan: 'mulai_pengumpulan',
+  batasPengumpulan: 'batas_pengumpulan_absensi',
   dendaAlpha: 'denda_alpha',
   dendaTerlambat: 'denda_terlambat',
   nilaiMinusAlpha: 'nilai_minus_alpha',
@@ -405,7 +382,9 @@ const CONFIG_DB_MAP = {
   helperPassword: 'helper_password',
   maxPointSubmit: 'max_point_submit',
   maxRedemptionPoint: 'max_redemption_point',
-  currentSemester: 'current_semester'
+  currentSemester: 'current_semester',
+  omrRequireCorners: 'omr_require_corners',
+  uploadBackend: 'upload_backend'
 };
 
 function initConfigMenu() {
@@ -427,25 +406,25 @@ async function loadConfigValues() {
     if (!data) throw new Error("Config not found");
 
     configCache = {
-      threshold: data.threshold,
-      validate: data.validate,
-      pagiStart: data.pagi_start,
-      pagiEnd: data.pagi_end,
-      ekstraStart: data.ekstra_start,
-      ekstraEnd: data.ekstra_end,
-      dendaAlpha: data.denda_alpha,
-      dendaTerlambat: data.denda_terlambat,
-      nilaiMinusAlpha: data.nilai_minus_alpha,
-      nilaiMinusTerlambat: data.nilai_minus_terlambat,
-      minusPointEnable: data.minus_point_enable,
-      minusPointThreshold: data.minus_point_threshold,
-      redemptionEnable: data.redemption_enable,
-      helperEnable: data.helper_enable,
-      helperPassword: data.helper_password,
-      maxPointSubmit: data.max_point_submit,
-      maxRedemptionPoint: data.max_redemption_point,
-      currentSemester: data.current_semester || 'STS (Ganjil)'
-    };
+  allowAppCamera: data.allow_app_camera,
+  validate: data.validate,
+  mulaiPengumpulan: data.mulai_pengumpulan,
+  batasPengumpulan: data.batas_pengumpulan_absensi,
+  dendaAlpha: data.denda_alpha,
+  dendaTerlambat: data.denda_terlambat,
+  nilaiMinusAlpha: data.nilai_minus_alpha,
+  nilaiMinusTerlambat: data.nilai_minus_terlambat,
+  minusPointEnable: data.minus_point_enable,
+  minusPointThreshold: data.minus_point_threshold,
+  redemptionEnable: data.redemption_enable,
+  helperEnable: data.helper_enable,
+  helperPassword: data.helper_password,
+  maxPointSubmit: data.max_point_submit,
+  maxRedemptionPoint: data.max_redemption_point,
+  currentSemester: data.current_semester || 'STS (Ganjil)',
+  uploadBackend: data.upload_backend || 'cloudinary',
+  omrRequireCorners: data.omr_require_corners
+};
 
     const { data: ketuaData, error: ketuaErr } = await sb
       .from('Ketua')
@@ -456,7 +435,6 @@ async function loadConfigValues() {
     ketuaCodesData = ketuaData || [];
 
     renderConfigMenu();
-    renderKetuaTab();
     switchConfigTab('config');
   } catch (err) {
     console.error(err);
@@ -469,27 +447,30 @@ function renderConfigMenu() {
   const list = document.getElementById("configList");
   if (!list) return;
 
-  const sections = [
-    {
-      title: "Periode Akademik",
-      items: [
-        { key: "currentSemester", label: "Semester Aktif", type: "select", options: ["STS (Ganjil)", "SAS (Ganjil)", "STS (Genap)", "SAS (Genap)"] }
-      ]
-    },
-    {
-      title: "Konfigurasi sistem",
-      items: [
-        { key: "threshold", label: "Akurasi Face ID", type: "slider", min: 0.1, max: 1.0, step: 0.05 },
-        { key: "pagiStart", label: "Pagi Mulai", type: "time" },
-        { key: "pagiEnd", label: "Pagi Selesai", type: "time" },
-        { key: "ekstraStart", label: "Ekstra Mulai", type: "time" },
-        { key: "ekstraEnd", label: "Ekstra Selesai", type: "time" },
-        { key: "dendaAlpha", label: "Denda alpha", type: "money" },
-        { key: "dendaTerlambat", label: "Denda terlambat/pagi", type: "money" },
-        { key: "nilaiMinusAlpha", label: "Nilai minus (Alpha)", type: "negative" },
-        { key: "nilaiMinusTerlambat", label: "Nilai minus (Terlambat/Pagi)", type: "negative" }
-      ]
-    },
+ const sections = [
+  {
+    title: "Periode Akademik",
+    items: [
+      { key: "currentSemester", label: "Semester Aktif", type: "select", options: ["STS (Ganjil)", "SAS (Ganjil)", "STS (Genap)", "SAS (Genap)"] }
+    ]
+  },
+  {
+    title: "Jendela Upload Bukti Absensi (Pembina)",
+    items: [
+      { key: "mulaiPengumpulan", label: "Mulai Pengumpulan", type: "time" },
+      { key: "batasPengumpulan", label: "Batas Pengumpulan Absensi", type: "time" },
+      { key: "allowAppCamera", label: "Izinkan pembina pakai kamera aplikasi", type: "toggle" }
+    ]
+  },
+  {
+    title: "Konfigurasi sistem",
+    items: [
+      { key: "dendaAlpha", label: "Denda alpha", type: "money" },
+      { key: "dendaTerlambat", label: "Denda terlambat/pagi", type: "money" },
+      { key: "nilaiMinusAlpha", label: "Nilai minus (Alpha)", type: "negative" },
+      { key: "nilaiMinusTerlambat", label: "Nilai minus (Terlambat/Pagi)", type: "negative" }
+    ]
+  },
     {
       title: "Sistem point",
       items: [
@@ -504,7 +485,19 @@ function renderConfigMenu() {
         { key: "helperEnable", label: "Siswa bisa mengabsen", type: "toggle" },
         { key: "helperPassword", label: "Password siswa", type: "text" }
       ]
-    }
+    },
+    {
+      title: "Sistem OMR",
+      items: [
+        { key: "omrRequireCorners", label: "Peringati jika sudut kertas tidak terdeteksi", type: "toggle" }
+      ]
+    },
+    {
+  title: "Layanan Upload Foto",
+  items: [
+    { key: "uploadBackend", label: "Backend Upload", type: "select", options: ["cloudinary", "discord"] }
+  ]
+}
   ];
 
   list.innerHTML = sections.map(section => {
@@ -847,11 +840,11 @@ async function selectKelolaStudent(nama) {
 
     // Load attendance for current semester
     const { data: attendance, error: attError } = await sb
-      .from('Attendance')
-      .select('date, status, period')
-      .eq('student_id', student.id)
-      .eq('semester', currentSemester)
-      .order('date', { ascending: false });
+  .from('AttendanceV2')
+  .select('id, date, status')
+  .eq('student_id', student.id)
+  .eq('semester', currentSemester)
+  .order('date', { ascending: false });
 
     if (attError) throw attError;
 
@@ -1062,10 +1055,10 @@ async function loadBermasalahData() {
 
     // 3. Alpha counts for current semester
     const { data: alphaRows, error: alphaErr } = await sb
-      .from('Attendance')
-      .select('student_id')
-      .eq('semester', currentSemester)
-      .eq('status', 'ALPHA');
+  .from('AttendanceV2')
+  .select('student_id')
+  .eq('semester', currentSemester)
+  .eq('status', 'ALPHA');
     if (alphaErr) throw alphaErr;
 
     const alphaCounts = {};
@@ -1331,126 +1324,6 @@ async function confirmExpelStudent() {
   }
   showLoading(false);
 }
-// ===== KODE KETUA SECTION =====
-function renderKetuaSection() {
-  const dateStr = getJakartaDateString();
-
-  if (!ketuaCodesData || ketuaCodesData.length === 0) {
-    return `
-      <div class="config-section-title">Kode Ketua — ${dateStr}</div>
-      <div class="config-item">
-        <div class="config-label">Tidak ada data ketua di tabel</div>
-      </div>
-    `;
-  }
-
-  const rows = ketuaCodesData.map(k => `
-    <div class="ketua-code-row">
-      <div class="ketua-code-info">
-        <div class="ketua-code-ekstra">${escapeHtml(k.ekstra)}</div>
-        <div class="ketua-code-value">${escapeHtml(k.password || '-')}</div>
-      </div>
-      <button class="ketua-code-btn" onclick="generateKetuaCode('${escapeHtml(k.ekstra)}')">🎲 Generate</button>
-    </div>
-  `).join('');
-
-  const waText = formatKetuaWaMessage();
-
-  return `
-    <div class="config-section-title">Kode Ketua — ${dateStr}</div>
-    <div class="config-item ketua-code-section">
-      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:12px;">
-        Kode diperbarui langsung ke database. Tekan Generate untuk membuat kode baru.
-      </div>
-      <div class="ketua-code-header">
-        <div class="config-label" style="margin-bottom:0;">Kode login harian (4 digit)</div>
-        <button class="ketua-generate-all-btn" onclick="generateAllKetuaCodes()">Generate Semua</button>
-      </div>
-      <div class="ketua-code-list">${rows}</div>
-      <div class="ketua-code-wa-wrap">
-        <div class="ketua-code-preview">${escapeHtml(waText)}</div>
-        <button class="ketua-wa-btn" onclick="sendKetuaCodesToWa()">📤 Kirim ke WhatsApp</button>
-      </div>
-    </div>
-  `;
-}
-
-function formatKetuaWaMessage() {
-  const date = getJakartaDateString();
-  let text = `*Kode Login Ketua Ekskul* 📋\n📅 ${date}\n\n`;
-  ketuaCodesData.forEach(k => {
-    text += `• *${k.ekstra}*: \`${k.password || '-'}\`\n`;
-  });
-  text += `\nMasukkan kode di ArkNet Hub untuk absen hari ini.`;
-  return text;
-}
-
-function sendKetuaCodesToWa() {
-  const text = formatKetuaWaMessage();
-  const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
-  window.open(url, '_blank');
-}
-
-async function generateKetuaCode(ekstra) {
-  const existing = new Set(ketuaCodesData.map(k => k.password).filter(Boolean));
-  let newCode;
-  let attempts = 0;
-  do {
-    newCode = Math.floor(1000 + Math.random() * 9000).toString();
-    attempts++;
-  } while (existing.has(newCode) && attempts < 100);
-
-  showLoading(true);
-  try {
-    const { error } = await sb
-      .from('Ketua')
-      .update({ password: newCode })
-      .eq('ekstra', ekstra);
-
-    if (error) throw error;
-
-    const item = ketuaCodesData.find(k => k.ekstra === ekstra);
-    if (item) item.password = newCode;
-
-    showStatus(`✓ Kode ${ekstra}: ${newCode}`, "ok");
-    renderConfigMenu();
-  } catch (err) {
-    showStatus("Error: " + err.message, "error");
-  }
-  showLoading(false);
-}
-
-async function generateAllKetuaCodes() {
-  showLoading(true);
-  try {
-    const usedCodes = new Set();
-
-    for (const k of ketuaCodesData) {
-      let newCode;
-      let attempts = 0;
-      do {
-        newCode = Math.floor(1000 + Math.random() * 9000).toString();
-        attempts++;
-      } while (usedCodes.has(newCode) && attempts < 100);
-
-      usedCodes.add(newCode);
-
-      const { error } = await sb
-        .from('Ketua')
-        .update({ password: newCode })
-        .eq('ekstra', k.ekstra);
-
-      if (error) throw error;
-      k.password = newCode;
-    }
-
-    showStatus("✓ Semua kode ketua diperbarui", "ok");
-    renderConfigMenu();
-  } catch (err) {
-    showStatus("Error: " + err.message, "error");
-  }
-  showLoading(false);
-}
 // ===== CONFIG TABS =====
 function switchConfigTab(tab) {
   configActiveTab = tab;
@@ -1475,132 +1348,1400 @@ function switchConfigTab(tab) {
     if (bottomBar) bottomBar.style.display = 'none';
   }
 }
+// ===== ADMIN MANUAL INPUT =====
+let adminInputStudents = [];
+let adminInputChanges = new Map();
 
-// ===== KODE KETUA TAB =====
-function renderKetuaTab() {
-  const container = document.getElementById("ketuaList");
+function showAdminInput() {
+  hideAllScreens();
+  const el = document.getElementById("adminInputScreen");
+  if (el) {
+    el.style.display = "flex";
+    initAdminInput();
+  }
+}
+
+async function initAdminInput() {
+  initAdminPhotoViewportEvents();
+
+  const select = document.getElementById('adminInputEkstra');
+  const ekstras = new Set();
+  Object.values(OPERATORS || {}).forEach(op => {
+    if (!op.isMaster && !op.isTatib && op.ekstra) ekstras.add(op.ekstra);
+  });
+  if (select) {
+    select.innerHTML = '<option value="">Pilih Ekskul</option>' +
+      Array.from(ekstras).sort().map(e => `<option value="${escapeHtml(e)}">${escapeHtml(e)}</option>`).join('');
+  }
+  renderAdminEkstraChips(Array.from(ekstras).sort());
+  loadAdminEkstraUploadStatus();
+  adminInputStudents = [];
+  adminInputChanges.clear();
+  const list = document.getElementById('adminInputList');
+  if (list) list.innerHTML = '<div class="empty-state" style="padding-top:40px;"><div class="empty-state-icon">📋</div><div class="empty-state-text">Pilih ekskul untuk memulai input</div></div>';
+  updateAdminInputStats();
+
+  // Reset the photo comparison pane (mobile defaults back to the input list)
+  adminInputMobileView = 'input';
+  const body = document.getElementById('adminInputBody');
+  if (body) body.classList.remove('show-photo');
+  const toggleBtn = document.getElementById('adminInputViewToggleBtn');
+  if (toggleBtn) toggleBtn.textContent = '🖼️ Lihat Foto';
+  loadAdminProofPhoto(null, null);
+}
+
+// ===== ADMIN INPUT: EKSTRA CHIP ROW (today's upload status at a glance) =====
+function renderAdminEkstraChips(ekstraList) {
+  const row = document.getElementById('adminEkstraChipRow');
+  if (!row) return;
+  row.innerHTML = ekstraList.map(e => `
+    <button type="button" class="admin-ekstra-chip" data-ekstra="${escapeHtml(e)}" onclick="selectAdminEkstraChip(this.dataset.ekstra)">
+      <span class="admin-ekstra-chip-dot"></span>
+      <span class="admin-ekstra-chip-label">${escapeHtml(e)}</span>
+    </button>
+  `).join('');
+}
+
+function selectAdminEkstraChip(ekstra) {
+  const select = document.getElementById('adminInputEkstra');
+  if (!select) return;
+  select.value = ekstra;
+  loadAdminInputList();
+}
+
+async function loadAdminEkstraUploadStatus() {
+  const today = todayJakartaDate();
+  try {
+    const { data, error } = await sb
+      .from('AttendanceProof')
+      .select('ekstra')
+      .eq('date', today)
+      .eq('semester', currentSemester);
+    if (error) throw error;
+    const uploaded = new Set((data || []).map(r => r.ekstra));
+    document.querySelectorAll('.admin-ekstra-chip').forEach(chip => {
+      markAdminEkstraChipStatus(chip.dataset.ekstra, uploaded.has(chip.dataset.ekstra));
+    });
+  } catch (e) {
+    // non-critical — chips just stay in the neutral "belum dicek" state
+  }
+}
+
+function markAdminEkstraChipStatus(ekstra, hasPhoto) {
+  document.querySelectorAll('.admin-ekstra-chip').forEach(chip => {
+    if (chip.dataset.ekstra !== ekstra) return;
+    const dot = chip.querySelector('.admin-ekstra-chip-dot');
+    if (!dot) return;
+    dot.classList.toggle('uploaded', hasPhoto);
+    dot.classList.toggle('missing', !hasPhoto);
+  });
+}
+
+async function loadAdminInputList() {
+  const select = document.getElementById('adminInputEkstra');
+  const ekstra = select ? select.value : "";
+  document.querySelectorAll('.admin-ekstra-chip').forEach(chip => {
+    chip.classList.toggle('active', chip.dataset.ekstra === ekstra);
+  });
+  if (!ekstra) {
+    loadAdminProofPhoto(null, null);
+    return;
+  }
+
+  // Load today's attendance-proof photo for this ekstra in parallel with the roster
+  loadAdminProofPhoto(ekstra, todayJakartaDate());
+
+  showLoading(true);
+  try {
+    const today = getJakartaDateString();
+    const { data: students, error: sErr } = await sb
+      .from('Database').select('id, nama, kelas, photo_url').eq('ekstra', ekstra).order('nama');
+    if (sErr) throw sErr;
+
+    const { data: att, error: aErr } = await sb
+      .from('AttendanceV2').select('student_id, status').eq('date', today).eq('semester', currentSemester);
+    if (aErr) throw aErr;
+
+    const attMap = {};
+    (att || []).forEach(a => attMap[a.student_id] = a.status);
+
+    adminInputStudents = (students || []).map(s => ({
+      id: s.id, nama: s.nama, kelas: s.kelas, photo_url: s.photo_url,
+      currentStatus: attMap[s.id] || null
+    }));
+    adminInputChanges.clear();
+    renderAdminInputList();
+    updateAdminInputStats();
+  } catch (err) {
+    showStatus("Error: " + err.message, "error");
+  }
+  showLoading(false);
+}
+
+let adminInputSearchQuery = '';
+let adminPickerTimer = null;
+let adminLongPressTriggered = false;
+let adminPickerTargetId = null;
+
+function onAdminRowMouseDown(e, id) {
+  adminLongPressTriggered = false;
+  adminPickerTargetId = id;
+  const row = e.currentTarget;
+  if (row) row.style.transform = 'scale(0.97)';
+
+  adminPickerTimer = setTimeout(() => {
+    adminLongPressTriggered = true;
+    if (row) row.style.transform = '';
+    openAdminInputPicker(id);
+  }, 500);
+}
+
+function onAdminRowMouseUp(e) {
+  clearTimeout(adminPickerTimer);
+  const row = e.currentTarget;
+  if (row) row.style.transform = '';
+}
+
+function onAdminRowTouchMove(e) {
+  clearTimeout(adminPickerTimer);
+  const row = e.currentTarget;
+  if (row) row.style.transform = '';
+}
+
+function onAdminRowClick(e, id) {
+  if (adminLongPressTriggered) {
+    adminLongPressTriggered = false;
+    return;
+  }
+  // Set focus to clicked row
+  const rows = getVisibleAdminRows();
+  rows.forEach((row, i) => {
+    if (row.getAttribute('data-id') === id) {
+      adminInputFocusedIndex = i;
+      row.classList.add('focused');
+    } else {
+      row.classList.remove('focused');
+    }
+  });
+  cycleAdminInputStatus(id);
+}
+
+function openAdminInputPicker(id) {
+  adminPickerTargetId = id;
+  const modal = document.getElementById('adminInputPickerModal');
+  if (modal) modal.classList.add('visible');
+}
+
+function closeAdminInputPicker() {
+  const modal = document.getElementById('adminInputPickerModal');
+  if (modal) modal.classList.remove('visible');
+  adminPickerTargetId = null;
+}
+
+function pickAdminStatus(status) {
+  if (!adminPickerTargetId) return;
+  setAdminInputStatus(adminPickerTargetId, status);
+  closeAdminInputPicker();
+}
+
+// ===== KEYBOARD NAVIGATION =====
+let adminInputFocusedIndex = -1;
+
+function setAdminInputFocus(idx) {
+  const rows = document.querySelectorAll('#adminInputList .admin-input-row');
+  if (!rows.length) return;
+
+  // Clamp index
+  if (idx < 0) idx = 0;
+  if (idx >= rows.length) idx = rows.length - 1;
+
+  adminInputFocusedIndex = idx;
+
+  rows.forEach((row, i) => {
+    row.classList.toggle('focused', i === idx);
+  });
+
+  // Scroll into view smoothly
+  const focusedRow = rows[idx];
+  if (focusedRow) {
+    focusedRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+
+function restoreAdminInputFocus() {
+  const rows = document.querySelectorAll('#adminInputList .admin-input-row');
+  if (!rows.length) {
+    adminInputFocusedIndex = -1;
+    return;
+  }
+
+  // Clamp to valid range
+  if (adminInputFocusedIndex >= rows.length) {
+    adminInputFocusedIndex = rows.length - 1;
+  }
+  if (adminInputFocusedIndex < 0) {
+    adminInputFocusedIndex = -1;
+    return;
+  }
+
+  // Apply focus
+  rows.forEach((row, i) => {
+    row.classList.toggle('focused', i === adminInputFocusedIndex);
+  });
+
+  // Scroll into view
+  const focusedRow = rows[adminInputFocusedIndex];
+  if (focusedRow) {
+    focusedRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+
+function getVisibleAdminRows() {
+  return document.querySelectorAll('#adminInputList .admin-input-row');
+}
+
+function getAdminRowStudentId(row) {
+  // Extract ID from the onclick attribute
+  const onclick = row.getAttribute('onclick') || '';
+  const match = onclick.match(/onAdminRowClick\(event,\s*'(.+?)'\)/);
+  return match ? match[1].replace(/\\'/g, "'") : null;
+}
+
+// Global keyboard listener
+document.addEventListener('keydown', (e) => {
+  const screen = document.getElementById('adminInputScreen');
+  if (!screen || screen.style.display === 'none') return;
+
+  // Don't intercept if a modal is open
+  const picker = document.getElementById('adminInputPickerModal');
+  if (picker && picker.classList.contains('visible')) return;
+
+  // Don't intercept if search input is focused
+  const searchInput = document.getElementById('adminInputSearch');
+  if (searchInput && document.activeElement === searchInput) {
+    // Only intercept Escape to blur search
+    if (e.key === 'Escape') {
+      searchInput.blur();
+      e.preventDefault();
+    }
+    return;
+  }
+
+  const rows = getVisibleAdminRows();
+  if (!rows.length) return;
+
+  // Search shortcuts
+  if (e.key === '/' || (e.ctrlKey && e.key === 'k')) {
+    e.preventDefault();
+    const searchInput = document.getElementById('adminInputSearch');
+    if (searchInput) {
+      searchInput.focus();
+      searchInput.select();
+    }
+    return;
+  }
+
+  switch (e.key) {
+    case 'ArrowDown':
+    case 'Tab':
+      e.preventDefault();
+      if (adminInputFocusedIndex === -1) {
+        setAdminInputFocus(0);
+      } else {
+        setAdminInputFocus(adminInputFocusedIndex + 1);
+      }
+      break;
+
+    case 'ArrowUp':
+      e.preventDefault();
+      if (adminInputFocusedIndex === -1) {
+        setAdminInputFocus(rows.length - 1);
+      } else {
+        setAdminInputFocus(adminInputFocusedIndex - 1);
+      }
+      break;
+
+    case 'Enter':
+    case ' ':
+      e.preventDefault();
+      if (adminInputFocusedIndex >= 0 && rows[adminInputFocusedIndex]) {
+        const id = getAdminRowStudentId(rows[adminInputFocusedIndex]);
+        if (id) cycleAdminInputStatus(id);
+      }
+      break;
+
+    case '1':
+      e.preventDefault();
+      applyStatusToFocused('HADIR');
+      break;
+    case '2':
+      e.preventDefault();
+      applyStatusToFocused('ALPHA');
+      break;
+    case '3':
+      e.preventDefault();
+      applyStatusToFocused('TERLAMBAT');
+      break;
+    case '4':
+      e.preventDefault();
+      applyStatusToFocused('IZIN');
+      break;
+    case '5':
+      e.preventDefault();
+      applyStatusToFocused('SAKIT');
+      break;
+    case '0':
+    case 'Delete':
+    case 'Backspace':
+      e.preventDefault();
+      applyStatusToFocused('');
+      break;
+  }
+});
+
+function applyStatusToFocused(status) {
+  const rows = getVisibleAdminRows();
+  if (adminInputFocusedIndex >= 0 && rows[adminInputFocusedIndex]) {
+    const id = getAdminRowStudentId(rows[adminInputFocusedIndex]);
+    if (id) setAdminInputStatus(id, status);
+  }
+}
+
+
+
+function onAdminInputSearch() {
+  const input = document.getElementById('adminInputSearch');
+  adminInputSearchQuery = input ? input.value.trim().toLowerCase() : '';
+  renderAdminInputList();
+}
+
+function cycleAdminInputStatus(id) {
+  const student = adminInputStudents.find(s => String(s.id) === String(id));
+  if (!student) return;
+
+  const order = ['', 'HADIR', 'ALPHA', 'TERLAMBAT', 'IZIN', 'SAKIT'];
+  const current = adminInputChanges.get(id);
+  const currentStatus = current !== undefined ? current : (student.currentStatus || '');
+  const idx = order.indexOf(currentStatus);
+  const nextIdx = (idx + 1) % order.length;
+  const nextStatus = order[nextIdx];
+
+  setAdminInputStatus(id, nextStatus);
+}
+
+function getAdminStatusClass(status) {
+  const s = (status || '').trim().toUpperCase();
+  if (s === 'HADIR') return 'status-hadir';
+  if (s === 'ALPHA') return 'status-alpha';
+  if (s === 'TERLAMBAT') return 'status-terlambat';
+  if (s === 'IZIN') return 'status-izin';
+  if (s === 'SAKIT') return 'status-sakit';
+  return 'status-kosong';
+}
+
+function renderAdminInputList() {
+  const container = document.getElementById('adminInputList');
   if (!container) return;
 
-  const dateStr = getJakartaDateString();
+  const filtered = adminInputSearchQuery 
+    ? adminInputStudents.filter(s => s.nama.toLowerCase().includes(adminInputSearchQuery))
+    : adminInputStudents;
 
-  if (!ketuaCodesData || ketuaCodesData.length === 0) {
+  if (filtered.length === 0) {
+    container.innerHTML = '<div class="empty-state" style="padding-top:40px;"><div class="empty-state-icon">📭</div><div class="empty-state-text">Tidak ada siswa</div></div>';
+    return;
+  }
+
+  container.innerHTML = filtered.map((s, i) => {
+    const changed = adminInputChanges.get(s.id);
+    const status = changed !== undefined ? changed : (s.currentStatus || '');
+    const statusClass = getAdminStatusClass(status);
+    const statusLabel = status || 'KOSONG';
+
+    const safeId = String(s.id).replace(/'/g, "\'");
+
+    return `
+      <div class="admin-input-row"
+           data-id="${safeId}"
+           onclick="onAdminRowClick(event, '${safeId}')"
+           onmousedown="onAdminRowMouseDown(event, '${safeId}')"
+           ontouchstart="onAdminRowMouseDown(event, '${safeId}')"
+           onmouseup="onAdminRowMouseUp(event)"
+           ontouchend="onAdminRowMouseUp(event)"
+           ontouchmove="onAdminRowTouchMove(event)">
+        <div class="admin-input-num">${i + 1}</div>
+        <div class="admin-input-info">
+          <div class="admin-input-name">${escapeHtml(s.nama)}</div>
+          <div class="admin-input-class">${escapeHtml(s.kelas)}</div>
+        </div>
+        <div class="admin-input-status ${statusClass}">${escapeHtml(statusLabel)}</div>
+      </div>
+    `;
+  }).join('');
+
+  // Restore focus after re-render
+  restoreAdminInputFocus();
+}
+
+function setAdminInputStatus(id, status) {
+  const student = adminInputStudents.find(s => String(s.id) === String(id));
+  if (!student) return;
+  const original = student.currentStatus || '';
+  if (status === original) adminInputChanges.delete(id);
+  else adminInputChanges.set(id, status);
+  renderAdminInputList();
+  updateAdminInputStats();
+}
+
+function markAllAdminInputHadir() {
+  adminInputStudents.forEach(s => {
+    if ((s.currentStatus || '') !== 'HADIR') adminInputChanges.set(s.id, 'HADIR');
+  });
+  renderAdminInputList();
+  updateAdminInputStats();
+}
+
+function updateAdminInputStats() {
+  const count = adminInputChanges.size;
+  const btn = document.getElementById('adminInputSaveBtn');
+  const label = document.getElementById('adminInputChangeCount');
+  if (btn) { btn.disabled = count === 0; btn.textContent = count > 0 ? `Simpan (${count})` : 'Simpan'; }
+  if (label) label.textContent = `${count} perubahan`;
+}
+
+// ===== ADMIN INPUT: PHOTO COMPARISON PANE =====
+// Mobile has no room for side-by-side, so a single pane toggles between
+// the manual input list and the full attendance-proof photo.
+let adminInputMobileView = 'input'; // 'input' | 'photo'
+
+function toggleAdminInputView() {
+  const body = document.getElementById('adminInputBody');
+  const btn = document.getElementById('adminInputViewToggleBtn');
+  if (!body) return;
+  adminInputMobileView = adminInputMobileView === 'input' ? 'photo' : 'input';
+  body.classList.toggle('show-photo', adminInputMobileView === 'photo');
+  if (btn) btn.textContent = adminInputMobileView === 'photo' ? '📝 Tandai Absensi' : '🖼️ Lihat Foto';
+}
+
+function todayJakartaDate() {
+  return getJakartaDateString();
+}
+
+function parseIndoDate(str) {
+  if (!str) return null;
+  const parts = str.trim().split(/\s+/);
+  if (parts.length < 3) return null;
+  const day = parseInt(parts[0], 10);
+  const monthIdx = BULAN_ID.findIndex(m => m.toLowerCase() === parts[1].toLowerCase());
+  const year = parseInt(parts[2], 10);
+  if (isNaN(day) || monthIdx === -1 || isNaN(year)) return null;
+  return new Date(year, monthIdx, day, 12, 0, 0);
+}
+
+function formatIndoDate(dateObj) {
+  return dateObj.getDate() + " " + BULAN_ID[dateObj.getMonth()] + " " + dateObj.getFullYear();
+}
+
+let adminInputCurrentEkstra = null;
+let adminProofCurrentDate = null;
+let adminProofCache = {};
+let adminProofLoadToken = 0;
+let adminProofPhotos = [];   // all pages/lembar for the current ekstra+date+semester
+let adminProofPhotoIndex = 0;
+
+async function loadAdminProofPhoto(ekstra, date) {
+  adminInputCurrentEkstra = ekstra;
+  adminProofCurrentDate = date;
+  updateAdminPhotoDateLabel();
+  updateAdminPhotoNavButtons();
+  adminPhotoZoomReset();
+
+  const img = document.getElementById('adminPhotoImg');
+  const emptyEl = document.getElementById('adminPhotoEmptyState');
+  const emptyText = document.getElementById('adminPhotoEmptyText');
+  const ekstraLabel = document.getElementById('adminPhotoEkstraLabel');
+  if (ekstraLabel) ekstraLabel.textContent = ekstra || '';
+
+  adminProofPhotos = [];
+  adminProofPhotoIndex = 0;
+
+  if (!ekstra) {
+    if (img) img.style.display = 'none';
+    if (emptyEl) emptyEl.style.display = 'flex';
+    if (emptyText) emptyText.textContent = 'Pilih ekskul untuk melihat foto';
+    updateAdminPhotoPageBar();
+    return;
+  }
+
+  const token = ++adminProofLoadToken;
+  const cacheKey = ekstra + '|' + date + '|' + currentSemester;
+
+  if (img) img.style.display = 'none';
+  if (emptyEl) emptyEl.style.display = 'flex';
+  if (emptyText) emptyText.textContent = 'Memuat foto...';
+  updateAdminPhotoPageBar();
+
+  let proofs = adminProofCache[cacheKey];
+  if (proofs === undefined) {
+    try {
+      const { data, error } = await sb
+        .from('AttendanceProof')
+        .select('photo_url, uploaded_by, uploaded_at, page')
+        .eq('ekstra', ekstra).eq('date', date).eq('semester', currentSemester)
+        .order('page', { ascending: true });
+      if (error) throw error;
+      proofs = data || [];
+    } catch (e) {
+      proofs = [];
+    }
+    adminProofCache[cacheKey] = proofs;
+  }
+
+  if (token !== adminProofLoadToken) return; // superseded by a newer request
+
+  adminProofPhotos = proofs;
+  adminProofPhotoIndex = 0;
+  if (date === todayJakartaDate()) markAdminEkstraChipStatus(ekstra, proofs.length > 0);
+  updateAdminPhotoPageBar();
+
+  if (!proofs.length) {
+    if (emptyText) emptyText.textContent = 'Pembina belum upload foto di sistem';
+    if (emptyEl) emptyEl.style.display = 'flex';
+    if (img) img.style.display = 'none';
+    return;
+  }
+
+  renderAdminProofPhoto(token);
+}
+
+function renderAdminProofPhoto(token) {
+  const img = document.getElementById('adminPhotoImg');
+  const emptyEl = document.getElementById('adminPhotoEmptyState');
+  const emptyText = document.getElementById('adminPhotoEmptyText');
+  const proof = adminProofPhotos[adminProofPhotoIndex];
+  if (!proof || !img) return;
+
+  adminPhotoZoomReset();
+  if (emptyEl) emptyEl.style.display = 'flex';
+  if (emptyText) emptyText.textContent = 'Memuat foto...';
+  img.style.display = 'none';
+
+  img.onload = () => {
+    if (token !== undefined && token !== adminProofLoadToken) return;
+    if (emptyEl) emptyEl.style.display = 'none';
+    img.style.display = 'block';
+  };
+  img.onerror = () => {
+    if (token !== undefined && token !== adminProofLoadToken) return;
+    if (emptyText) emptyText.textContent = 'Gagal memuat gambar';
+    if (emptyEl) emptyEl.style.display = 'flex';
+    img.style.display = 'none';
+  };
+  img.src = proof.photo_url;
+}
+
+function updateAdminPhotoPageBar() {
+  const bar = document.getElementById('adminPhotoPageBar');
+  const label = document.getElementById('adminPhotoPageLabel');
+  const prevBtn = document.getElementById('adminPhotoPagePrevBtn');
+  const nextBtn = document.getElementById('adminPhotoPageNextBtn');
+  if (!bar) return;
+
+  if (adminProofPhotos.length <= 1) {
+    bar.style.display = 'none';
+    return;
+  }
+
+  bar.style.display = 'flex';
+  if (label) label.textContent = `Lembar ${adminProofPhotoIndex + 1}/${adminProofPhotos.length}`;
+  if (prevBtn) prevBtn.disabled = adminProofPhotoIndex <= 0;
+  if (nextBtn) nextBtn.disabled = adminProofPhotoIndex >= adminProofPhotos.length - 1;
+}
+
+function adminPhotoShiftPage(delta) {
+  const next = adminProofPhotoIndex + delta;
+  if (next < 0 || next >= adminProofPhotos.length) return;
+  adminProofPhotoIndex = next;
+  updateAdminPhotoPageBar();
+  renderAdminProofPhoto(adminProofLoadToken);
+}
+
+function updateAdminPhotoDateLabel() {
+  const label = document.getElementById('adminPhotoDateLabel');
+  if (!label) return;
+  if (!adminProofCurrentDate) { label.textContent = '-'; return; }
+  label.textContent = adminProofCurrentDate === todayJakartaDate()
+    ? `${adminProofCurrentDate} (Hari ini)`
+    : adminProofCurrentDate;
+}
+
+function updateAdminPhotoNavButtons() {
+  const nextBtn = document.getElementById('adminPhotoNextBtn');
+  if (!nextBtn) return;
+  nextBtn.disabled = !adminProofCurrentDate || adminProofCurrentDate === todayJakartaDate();
+}
+
+function adminProofShiftDate(deltaDays) {
+  if (!adminInputCurrentEkstra) return;
+  const current = parseIndoDate(adminProofCurrentDate) || parseIndoDate(todayJakartaDate());
+  if (!current) return;
+  current.setDate(current.getDate() + deltaDays);
+
+  const todayD = parseIndoDate(todayJakartaDate());
+  if (deltaDays > 0 && todayD && current > todayD) return; // no browsing into the future
+
+  loadAdminProofPhoto(adminInputCurrentEkstra, formatIndoDate(current));
+}
+
+function openAdminProofDatePicker() {
+  if (!adminInputCurrentEkstra) return;
+  const modal = document.getElementById('adminProofDateModal');
+  const list = document.getElementById('adminProofDateModalList');
+  if (!modal || !list) return;
+  modal.classList.add('visible');
+  list.innerHTML = '<div class="overseer-empty">Memuat...</div>';
+  loadAdminProofDateOptions(adminInputCurrentEkstra, list);
+}
+
+function closeAdminProofDateModal() {
+  const modal = document.getElementById('adminProofDateModal');
+  if (modal) modal.classList.remove('visible');
+}
+
+async function loadAdminProofDateOptions(ekstra, list) {
+  try {
+    const { data, error } = await sb
+      .from('AttendanceProof')
+      .select('date')
+      .eq('ekstra', ekstra)
+      .eq('semester', currentSemester)
+      .order('date', { ascending: false });
+    if (error) throw error;
+
+    const seen = new Set();
+    const dates = (data || []).map(d => d.date).filter(d => {
+      if (seen.has(d)) return false;
+      seen.add(d);
+      return true;
+    });
+
+    const today = todayJakartaDate();
+    if (!dates.includes(today)) dates.unshift(today);
+    dates.sort((a, b) => {
+      const da = parseIndoDate(a), db = parseIndoDate(b);
+      if (!da || !db) return 0;
+      return db - da;
+    });
+
+    if (!dates.length) {
+      list.innerHTML = '<div class="empty-state" style="padding-top:24px;"><div class="empty-state-icon">📭</div><div class="empty-state-text">Belum ada foto diupload</div></div>';
+      return;
+    }
+
+    list.innerHTML = dates.map(d => `
+      <div class="proof-date-btn" onclick="selectAdminProofDateFromModal('${escapeHtml(d)}')">
+        <div class="proof-date-icon">📅</div>
+        <div class="proof-date-text">${escapeHtml(d)}${d === today ? ' (Hari ini)' : ''}</div>
+        <div class="proof-date-arrow">▶</div>
+      </div>
+    `).join('');
+  } catch (err) {
+    list.innerHTML = '<div class="overseer-empty">Gagal memuat</div>';
+  }
+}
+
+function selectAdminProofDateFromModal(date) {
+  closeAdminProofDateModal();
+  loadAdminProofPhoto(adminInputCurrentEkstra, date);
+}
+
+// ===== ADMIN INPUT: PHOTO ZOOM & PAN =====
+let adminPhotoScale = 1;
+let adminPhotoTx = 0;
+let adminPhotoTy = 0;
+let adminPhotoPointers = new Map();
+let adminPhotoPinchStartDist = 0;
+let adminPhotoPinchStartScale = 1;
+let adminPhotoPanStart = null;
+
+function adminPhotoApplyTransform() {
+  const img = document.getElementById('adminPhotoImg');
+  if (img) img.style.transform = `translate(calc(-50% + ${adminPhotoTx}px), calc(-50% + ${adminPhotoTy}px)) scale(${adminPhotoScale})`;
+}
+
+function adminPhotoZoomReset() {
+  adminPhotoScale = 1;
+  adminPhotoTx = 0;
+  adminPhotoTy = 0;
+  adminPhotoApplyTransform();
+}
+
+function adminPhotoZoom(dir) {
+  const factor = dir > 0 ? 1.3 : (1 / 1.3);
+  adminPhotoScale = Math.min(5, Math.max(1, adminPhotoScale * factor));
+  if (adminPhotoScale === 1) { adminPhotoTx = 0; adminPhotoTy = 0; }
+  adminPhotoApplyTransform();
+}
+
+function initAdminPhotoViewportEvents() {
+  const vp = document.getElementById('adminPhotoViewport');
+  if (!vp || vp.dataset.bound) return;
+  vp.dataset.bound = '1';
+
+  function isPhotoActive() {
+    const img = document.getElementById('adminPhotoImg');
+    return img && img.style.display !== 'none';
+  }
+
+  vp.addEventListener('wheel', (e) => {
+    if (!isPhotoActive()) return;
+    e.preventDefault();
+    adminPhotoZoom(e.deltaY < 0 ? 1 : -1);
+  }, { passive: false });
+
+  vp.addEventListener('pointerdown', (e) => {
+    if (!isPhotoActive()) return;
+    vp.setPointerCapture(e.pointerId);
+    adminPhotoPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (adminPhotoPointers.size === 1) {
+      adminPhotoPanStart = { x: e.clientX, y: e.clientY, tx: adminPhotoTx, ty: adminPhotoTy };
+    } else if (adminPhotoPointers.size === 2) {
+      const pts = Array.from(adminPhotoPointers.values());
+      adminPhotoPinchStartDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      adminPhotoPinchStartScale = adminPhotoScale;
+    }
+  });
+
+  vp.addEventListener('pointermove', (e) => {
+    if (!adminPhotoPointers.has(e.pointerId)) return;
+    adminPhotoPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (adminPhotoPointers.size === 2) {
+      const pts = Array.from(adminPhotoPointers.values());
+      const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      if (adminPhotoPinchStartDist > 0) {
+        adminPhotoScale = Math.min(5, Math.max(1, adminPhotoPinchStartScale * (dist / adminPhotoPinchStartDist)));
+        adminPhotoApplyTransform();
+      }
+    } else if (adminPhotoPointers.size === 1 && adminPhotoPanStart) {
+      adminPhotoTx = adminPhotoPanStart.tx + (e.clientX - adminPhotoPanStart.x);
+      adminPhotoTy = adminPhotoPanStart.ty + (e.clientY - adminPhotoPanStart.y);
+      adminPhotoApplyTransform();
+    }
+  });
+
+  function releasePointer(e) {
+    adminPhotoPointers.delete(e.pointerId);
+    if (adminPhotoPointers.size < 2) adminPhotoPinchStartDist = 0;
+    if (adminPhotoPointers.size === 0) adminPhotoPanStart = null;
+  }
+  vp.addEventListener('pointerup', releasePointer);
+  vp.addEventListener('pointercancel', releasePointer);
+  vp.addEventListener('pointerleave', releasePointer);
+
+  vp.addEventListener('dblclick', () => adminPhotoZoomReset());
+}
+
+async function submitAdminInput() {
+  if (adminInputChanges.size === 0) return;
+  const today = getJakartaDateString();
+  showLoading(true);
+  try {
+    const upserts = [];
+    const toDelete = [];
+    adminInputChanges.forEach((status, id) => {
+      if (status) upserts.push({ student_id: id, date: today, status, semester: currentSemester, operator: currentOperator });
+      else toDelete.push(id);
+    });
+
+    if (upserts.length) {
+      const { error } = await sb.from('AttendanceV2').upsert(upserts, { onConflict: 'student_id,date,semester' });
+      if (error) throw error;
+    }
+    if (toDelete.length) {
+      const { error } = await sb.from('AttendanceV2').delete().eq('date', today).eq('semester', currentSemester).in('student_id', toDelete);
+      if (error) throw error;
+    }
+
+    showStatus(`✓ ${upserts.length} data tersimpan`, "ok");
+    adminInputChanges.clear();
+    loadAdminInputList();
+  } catch (err) {
+    showStatus("Error: " + err.message, "error");
+  }
+  showLoading(false);
+}
+
+// ===== PROOF VIEWER =====
+// ===== PROOF VIEWER =====
+let proofViewerDates = [];
+let proofViewerCurrentDate = null;
+let proofViewerCurrentEkstra = null;
+let proofViewerEkstraList = [];
+let proofViewerProofMap = {};
+
+function showProofViewer() {
+  hideAllScreens();
+  const el = document.getElementById("proofViewerScreen");
+  if (el) {
+    el.style.display = "flex";
+    resetProofViewer();
+    loadProofDates();
+  }
+}
+
+function resetProofViewer() {
+  proofViewerCurrentDate = null;
+  proofViewerCurrentEkstra = null;
+  proofViewerProofMap = {};
+  document.getElementById('proofDateListView').style.display = 'block';
+  document.getElementById('proofEkstraListView').style.display = 'none';
+  document.getElementById('proofPhotoView').style.display = 'none';
+  document.getElementById('proofViewerSubtitle').textContent = 'Pilih tanggal';
+}
+
+function backProofViewer() {
+  if (document.getElementById('proofPhotoView').style.display !== 'none') {
+    showProofEkstraList();
+  } else if (document.getElementById('proofEkstraListView').style.display !== 'none') {
+    resetProofViewer();
+    loadProofDates();
+  } else {
+    // If opened from Tatib, return to Tatib screen instead of Admin
+    if (typeof isTatib !== 'undefined' && isTatib) {
+      hideAllScreens();
+      showTatibScreen();
+    } else {
+      backToKelolaAbsensi();
+    }
+  }
+}
+
+async function loadProofDates() {
+  const container = document.getElementById('proofDateList');
+  if (container) container.innerHTML = '<div class="overseer-empty">Memuat...</div>';
+  
+  try {
+    const { data, error } = await sb
+      .from('AttendanceProof')
+      .select('date')
+      .eq('semester', currentSemester)
+      .order('date', { ascending: false });
+    
+    if (error) throw error;
+    
+    const seen = new Set();
+    proofViewerDates = (data || []).filter(d => {
+      if (seen.has(d.date)) return false;
+      seen.add(d.date);
+      return true;
+    });
+    
+    renderProofDateList();
+  } catch (err) {
+    showStatus('Error: ' + err.message, 'error');
+    if (container) container.innerHTML = '<div class="overseer-empty">Gagal memuat</div>';
+  }
+}
+
+function renderProofDateList() {
+  const container = document.getElementById('proofDateList');
+  if (!container) return;
+  
+  if (!proofViewerDates.length) {
     container.innerHTML = `
-      <div class="config-section-title">Kode Ketua — ${dateStr}</div>
-      <div class="config-item">
-        <div class="config-label">Tidak ada data ketua di tabel</div>
+      <div class="empty-state" style="padding-top:40px;">
+        <div class="empty-state-icon">📭</div>
+        <div class="empty-state-text">Belum ada bukti upload</div>
+      </div>`;
+    return;
+  }
+  
+  container.innerHTML = proofViewerDates.map(d => `
+    <div class="proof-date-btn" onclick="selectProofDate('${escapeHtml(d.date)}')">
+      <div class="proof-date-icon">📅</div>
+      <div class="proof-date-text">${escapeHtml(d.date)}</div>
+      <div class="proof-date-arrow">▶</div>
+    </div>
+  `).join('');
+}
+
+async function selectProofDate(date) {
+  proofViewerCurrentDate = date;
+  document.getElementById('proofViewerSubtitle').textContent = date;
+  document.getElementById('proofEkstraDateLabel').textContent = date;
+  
+  const container = document.getElementById('proofEkstraList');
+  if (container) container.innerHTML = '<div class="overseer-empty">Memuat...</div>';
+  
+  document.getElementById('proofDateListView').style.display = 'none';
+  document.getElementById('proofEkstraListView').style.display = 'block';
+  document.getElementById('proofPhotoView').style.display = 'none';
+  
+  try {
+    const { data: students, error: sErr } = await sb
+      .from('Database')
+      .select('ekstra');
+    if (sErr) throw sErr;
+    
+    const ekstraSet = new Set();
+    (students || []).forEach(s => {
+      const e = (s.ekstra || '').trim();
+      if (e && e !== '0') ekstraSet.add(e);
+    });
+    proofViewerEkstraList = Array.from(ekstraSet).sort();
+    
+    const { data: proofs, error: pErr } = await sb
+      .from('AttendanceProof')
+      .select('ekstra, photo_url, uploaded_by, uploaded_at, page')
+      .eq('date', date)
+      .eq('semester', currentSemester)
+      .order('page', { ascending: true });
+    if (pErr) throw pErr;
+    
+    proofViewerProofMap = {};
+    (proofs || []).forEach(p => {
+      if (!proofViewerProofMap[p.ekstra]) proofViewerProofMap[p.ekstra] = [];
+      proofViewerProofMap[p.ekstra].push(p);
+    });
+    
+    renderProofEkstraList();
+  } catch (err) {
+    showStatus('Error: ' + err.message, 'error');
+    if (container) container.innerHTML = '<div class="overseer-empty">Gagal memuat</div>';
+  }
+}
+
+function renderProofEkstraList() {
+  const container = document.getElementById('proofEkstraList');
+  if (!container) return;
+  
+  if (!proofViewerEkstraList.length) {
+    container.innerHTML = `
+      <div class="empty-state" style="padding-top:40px;">
+        <div class="empty-state-icon">📭</div>
+        <div class="empty-state-text">Tidak ada ekskul terdaftar</div>
+      </div>`;
+    return;
+  }
+  
+  container.innerHTML = proofViewerEkstraList.map(ekstra => {
+    const proofs = proofViewerProofMap[ekstra];
+    const hasPhoto = !!(proofs && proofs.length);
+    const metaText = hasPhoto
+      ? (proofs.length > 1 ? `${proofs.length} lembar tersedia` : 'Foto tersedia')
+      : 'Belum ada foto';
+    return `
+      <div class="proof-ekstra-item" onclick="selectProofEkstra('${escapeHtml(ekstra)}')">
+        <div class="proof-ekstra-info">
+          <div class="proof-ekstra-name">${escapeHtml(ekstra)}</div>
+          <div class="proof-ekstra-meta">${metaText}</div>
+        </div>
+        <div class="proof-ekstra-badge ${hasPhoto ? 'has' : 'missing'}">
+          ${hasPhoto ? '✓' : '✗'}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function selectProofEkstra(ekstra) {
+  proofViewerCurrentEkstra = ekstra;
+  const proofs = proofViewerProofMap[ekstra];
+  
+  document.getElementById('proofDateListView').style.display = 'none';
+  document.getElementById('proofEkstraListView').style.display = 'none';
+  document.getElementById('proofPhotoView').style.display = 'block';
+  document.getElementById('proofViewerSubtitle').textContent = ekstra;
+  
+  const container = document.getElementById('proofPhotoContent');
+  if (!container) return;
+  
+  if (!proofs || !proofs.length) {
+    container.innerHTML = `
+      <div class="proof-empty">
+        <div class="proof-empty-icon">⚠️</div>
+        <div class="proof-empty-title">Pembina belum upload foto absen</div>
+        <div class="proof-empty-sub">Tanggal: ${escapeHtml(proofViewerCurrentDate)}</div>
       </div>
     `;
     return;
   }
-
-  const rows = ketuaCodesData.map(k => `
-    <div class="ketua-code-row">
-      <div class="ketua-code-info">
-        <div class="ketua-code-ekstra">${escapeHtml(k.ekstra)}</div>
-        <div class="ketua-code-value">${escapeHtml(k.password || '-')}</div>
+  
+  container.innerHTML = proofs.map((proof, i) => {
+    const uploadedAt = proof.uploaded_at
+      ? new Date(proof.uploaded_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })
+      : '-';
+    return `
+    <div class="proof-photo-card" style="${i > 0 ? 'margin-top:16px;' : ''}" onclick="window.open('${escapeHtml(proof.photo_url)}','_blank')">
+      <div class="proof-photo-frame">
+        <img src="${escapeHtml(proof.photo_url)}" alt="Bukti absensi lembar ${proof.page || i + 1}" onerror="this.parentElement.innerHTML='<div class=\\'proof-photo-error\\'>Gagal memuat gambar</div>'">
       </div>
-      <button class="ketua-code-btn" onclick="generateKetuaCode('${escapeHtml(k.ekstra)}')">🎲 Generate</button>
-    </div>
-  `).join('');
-
-  const waText = formatKetuaWaMessage();
-
-  container.innerHTML = `
-    <div class="config-section-title">Kode Ketua — ${dateStr}</div>
-    <div class="config-item ketua-code-section">
-      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:12px;">
-        Kode diperbarui langsung ke database. Tekan Generate untuk membuat kode baru.
-      </div>
-      <div class="ketua-code-header">
-        <div class="config-label" style="margin-bottom:0;">Kode login harian (4 digit)</div>
-        <button class="ketua-generate-all-btn" onclick="generateAllKetuaCodes()">Generate Semua</button>
-      </div>
-      <div class="ketua-code-list">${rows}</div>
-      <div class="ketua-code-wa-wrap">
-        <div class="ketua-code-preview">${escapeHtml(waText)}</div>
-        <button class="ketua-wa-btn" onclick="sendKetuaCodesToWa()">📤 Kirim ke WhatsApp</button>
+      <div class="proof-photo-meta">
+        <div class="proof-meta-row">
+          <span class="proof-meta-label">Lembar</span>
+          <span class="proof-meta-value">${proof.page || i + 1} / ${proofs.length}</span>
+        </div>
+        <div class="proof-meta-row">
+          <span class="proof-meta-label">Diupload oleh</span>
+          <span class="proof-meta-value">${escapeHtml(proof.uploaded_by)}</span>
+        </div>
+        <div class="proof-meta-row">
+          <span class="proof-meta-label">Waktu upload</span>
+          <span class="proof-meta-value">${uploadedAt}</span>
+        </div>
       </div>
     </div>
   `;
+  }).join('') + `<div class="proof-photo-hint">Klik gambar untuk membuka di tab baru</div>`;
 }
 
-function formatKetuaWaMessage() {
-  const date = getJakartaDateString();
-  let text = `*Kode Login Ketua Ekskul* 📋\n📅 ${date}\n\n`;
-  ketuaCodesData.forEach(k => {
-    text += `• *${k.ekstra}*: \`${k.password || '-'}\`\n`;
-  });
-  text += `\nMasukkan kode di ArkNet Hub untuk absen hari ini.`;
-  return text;
+function showProofEkstraList() {
+  document.getElementById('proofPhotoView').style.display = 'none';
+  document.getElementById('proofEkstraListView').style.display = 'block';
+  document.getElementById('proofViewerSubtitle').textContent = proofViewerCurrentDate;
+}
+// ===== UTILS =====
+
+
+// ===== KELOLA ABSENSI =====
+function showKelolaAbsensi() {
+  hideAllScreens();
+  const el = document.getElementById('kelolaAbsensiScreen');
+  if (el) el.style.display = 'flex';
 }
 
-function sendKetuaCodesToWa() {
-  const text = formatKetuaWaMessage();
-  const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
-  window.open(url, '_blank');
+function backToKelolaAbsensi() {
+  hideAllScreens();
+  showKelolaAbsensi();
 }
 
-async function generateKetuaCode(ekstra) {
-  const existing = new Set(ketuaCodesData.map(k => k.password).filter(Boolean));
-  let newCode;
-  let attempts = 0;
-  do {
-    newCode = Math.floor(1000 + Math.random() * 9000).toString();
-    attempts++;
-  } while (existing.has(newCode) && attempts < 100);
+// ===== PRINT ABSENSI =====
+let printAbsensiData = [];
+let printAbsensiSelectedEkstra = null;
 
+function showPrintAbsensi() {
+  hideAllScreens();
+  const el = document.getElementById('printAbsensiScreen');
+  if (el) {
+    el.style.display = 'flex';
+    loadPrintAbsensiList();
+  }
+}
+
+async function loadPrintAbsensiList() {
   showLoading(true);
   try {
-    const { error } = await sb
-      .from('Ketua')
-      .update({ password: newCode })
-      .eq('ekstra', ekstra);
+    // Get all ekstras from OPERATORS (excluding master/tatib)
+    const ekstras = [];
+    for (const [key, val] of Object.entries(OPERATORS || {})) {
+      if (!val.isMaster && !val.isTatib && val.ekstra) {
+        ekstras.push(val.ekstra);
+      }
+    }
+    const uniqueEkstras = [...new Set(ekstras)].sort();
+
+    // Count students per ekstra
+    const counts = {};
+    for (const ekstra of uniqueEkstras) {
+      const { count, error } = await sb
+        .from('Database')
+        .select('*', { count: 'exact', head: true })
+        .eq('ekstra', ekstra);
+      counts[ekstra] = error ? 0 : (count || 0);
+    }
+
+    printAbsensiData = uniqueEkstras.map(ekstra => ({
+      name: ekstra,
+      count: counts[ekstra] || 0,
+      pages: Math.ceil((counts[ekstra] || 0) / 30) || 1
+    }));
+
+    renderPrintAbsensiList();
+  } catch (err) {
+    showStatus('Error: ' + err.message, 'error');
+  }
+  showLoading(false);
+}
+
+function renderPrintAbsensiList() {
+  const container = document.getElementById('printAbsensiList');
+  const listView = document.getElementById('printAbsensiListView');
+  const previewView = document.getElementById('printAbsensiPreviewView');
+
+  if (listView) listView.style.display = 'block';
+  if (previewView) previewView.style.display = 'none';
+
+  if (!container) return;
+
+  if (!printAbsensiData.length) {
+    container.innerHTML = '<div class="empty-state" style="padding:24px;"><div class="empty-state-icon">📭</div><div class="empty-state-text">Tidak ada ekskul</div></div>';
+    return;
+  }
+
+  container.innerHTML = printAbsensiData.map(e => `
+    <div class="print-ekstra-item" onclick="showPrintAbsensiPreview('${escapeHtml(e.name)}')">
+      <div class="print-ekstra-info">
+        <div class="print-ekstra-name">${escapeHtml(e.name)}</div>
+        <div class="print-ekstra-meta">${e.count} siswa</div>
+      </div>
+      <div class="print-ekstra-pages">~${e.pages} hal</div>
+    </div>
+  `).join('');
+}
+
+async function showPrintAbsensiPreview(ekstraName) {
+  printAbsensiSelectedEkstra = ekstraName;
+  showLoading(true);
+
+  try {
+    const { data: students, error } = await sb
+      .from('Database')
+      .select('id, nama, kelas')
+      .eq('ekstra', ekstraName)
+      .order('nama');
 
     if (error) throw error;
 
-    const item = ketuaCodesData.find(k => k.ekstra === ekstra);
-    if (item) item.password = newCode;
+    const list = students || [];
+    const dateStr = getJakartaDateString();
+    const semStr = currentSemester || '-';
 
-    showStatus(`✓ Kode ${ekstra}: ${newCode}`, "ok");
-    renderKetuaTab();
+    // 32 students per page max (readable font size)
+    const studentsPerPage = 30;
+    const pages = [];
+    for (let i = 0; i < list.length; i += studentsPerPage) {
+      pages.push(list.slice(i, i + studentsPerPage));
+    }
+    if (pages.length === 0) pages.push([]);
+
+    // Generate HTML
+    const previewArea = document.getElementById('printAbsensiPreviewArea');
+    if (!previewArea) return;
+
+    previewArea.innerHTML = pages.map((pageStudents, pageIdx) => `
+      <div class="print-paper" id="printPaper_${pageIdx}">
+        <div class="print-corner tl"></div>
+        <div class="print-corner tr"></div>
+        <div class="print-corner bl"></div>
+        <div class="print-corner br"></div>
+
+        <div class="print-paper-header">
+          <div class="print-paper-title">DAFTAR HADIR EKSTRAKURIKULER</div>
+          <div class="print-paper-subtitle">${escapeHtml(ekstraName)} &mdash; ${semStr}</div>
+          <div class="print-paper-meta">
+            <span>Tanggal: ${dateStr}</span>
+          </div>
+        </div>
+
+        <table class="print-main-table">
+          <thead>
+            <tr>
+              <th rowspan="3">No</th>
+              <th rowspan="3">Nama</th>
+              <th rowspan="3">Kelas</th>
+              <th colspan="6" class="attendance-header">Kehadiran</th>
+              <th rowspan="3">No</th>
+            </tr>
+            <tr>
+              <th colspan="6" class="attendance-date-blank">&nbsp;</th>
+            </tr>
+            <tr>
+              <th class="attendance-col">PAGI</th>
+              <th class="attendance-col">EKSTRA</th>
+              <th class="attendance-col">PAGI</th>
+              <th class="attendance-col">EKSTRA</th>
+              <th class="attendance-col">PAGI</th>
+              <th class="attendance-col">EKSTRA</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${pageStudents.map((s, i) => `
+              <tr>
+                <td>${pageIdx * studentsPerPage + i + 1}</td>
+                <td>${escapeHtml(s.nama)}</td>
+                <td>${escapeHtml(s.kelas)}</td>
+                <td class="attendance-col"><span class="print-square"></span></td>
+                <td class="attendance-col"><span class="print-square"></span></td>
+                <td class="attendance-col"><span class="print-square"></span></td>
+                <td class="attendance-col"><span class="print-square"></span></td>
+                <td class="attendance-col"><span class="print-square"></span></td>
+                <td class="attendance-col"><span class="print-square"></span></td>
+                <td>${pageIdx * studentsPerPage + i + 1}</td>
+              </tr>
+            `).join('')}
+            ${pageStudents.length < studentsPerPage ? 
+              Array(studentsPerPage - pageStudents.length).fill(0).map((_, i) => `
+              <tr>
+                <td>${pageIdx * studentsPerPage + pageStudents.length + i + 1}</td>
+                <td></td>
+                <td></td>
+                <td class="attendance-col"><span class="print-square"></span></td>
+                <td class="attendance-col"><span class="print-square"></span></td>
+                <td class="attendance-col"><span class="print-square"></span></td>
+                <td class="attendance-col"><span class="print-square"></span></td>
+                <td class="attendance-col"><span class="print-square"></span></td>
+                <td class="attendance-col"><span class="print-square"></span></td>
+                <td>${pageIdx * studentsPerPage + pageStudents.length + i + 1}</td>
+              </tr>
+            `).join('') : ''}
+          </tbody>
+        </table>
+
+        ${pageIdx === pages.length - 1 ? `
+        <div class="print-paper-footer">
+          <div class="print-signature">
+            <div class="print-signature-label">Mengetahui,</div>
+            <div class="print-signature-line">(_______________________)</div>
+            <div>Pembina Ekskul</div>
+          </div>
+        </div>
+        ` : ''}
+      </div>
+    `).join('');
+
+    document.getElementById('printAbsensiListView').style.display = 'none';
+    document.getElementById('printAbsensiPreviewView').style.display = 'block';
+
   } catch (err) {
-    showStatus("Error: " + err.message, "error");
+    showStatus('Error: ' + err.message, 'error');
   }
   showLoading(false);
 }
 
-async function generateAllKetuaCodes() {
+function backToPrintAbsensiList() {
+  document.getElementById('printAbsensiListView').style.display = 'block';
+  document.getElementById('printAbsensiPreviewView').style.display = 'none';
+  printAbsensiSelectedEkstra = null;
+}
+
+function savePrintAbsensiPDF() {
+  window.print();
+}
+
+async function printAllAbsensi() {
   showLoading(true);
   try {
-    const usedCodes = new Set();
+    const dateStr = getJakartaDateString();
+    const semStr = currentSemester || '-';
+    const allPages = [];
 
-    for (const k of ketuaCodesData) {
-      let newCode;
-      let attempts = 0;
-      do {
-        newCode = Math.floor(1000 + Math.random() * 9000).toString();
-        attempts++;
-      } while (usedCodes.has(newCode) && attempts < 100);
+    for (const ekstra of printAbsensiData) {
+      const { data: students, error } = await sb
+        .from('Database')
+        .select('id, nama, kelas')
+        .eq('ekstra', ekstra.name)
+        .order('nama');
 
-      usedCodes.add(newCode);
+      if (error) continue;
+      const list = students || [];
 
-      const { error } = await sb
-        .from('Ketua')
-        .update({ password: newCode })
-        .eq('ekstra', k.ekstra);
-
-      if (error) throw error;
-      k.password = newCode;
+      const studentsPerPage = 30;
+      for (let i = 0; i < list.length; i += studentsPerPage) {
+        allPages.push({
+          ekstra: ekstra.name,
+          students: list.slice(i, i + studentsPerPage),
+          startIdx: i,
+          dateStr,
+          semStr
+        });
+      }
     }
 
-    showStatus("✓ Semua kode ketua diperbarui", "ok");
-    renderKetuaTab();
+    const previewArea = document.getElementById('printAbsensiPreviewArea');
+    if (previewArea) {
+      previewArea.innerHTML = allPages.map((p, idx) => `
+        <div class="print-paper" id="printPaper_all_${idx}">
+          <div class="print-corner tl"></div>
+          <div class="print-corner tr"></div>
+          <div class="print-corner bl"></div>
+          <div class="print-corner br"></div>
+
+          <div class="print-paper-header">
+            <div class="print-paper-title">DAFTAR HADIR EKSTRAKURIKULER</div>
+            <div class="print-paper-subtitle">${escapeHtml(p.ekstra)} &mdash; ${p.semStr}</div>
+            <div class="print-paper-meta">
+              <span>Tanggal cetak: ${p.dateStr}</span>
+            </div>
+          </div>
+
+          <table class="print-main-table">
+          <thead>
+            <tr>
+              <th rowspan="3">No</th>
+              <th rowspan="3">Nama</th>
+              <th rowspan="3">Kelas</th>
+              <th colspan="6" class="attendance-header">Kehadiran</th>
+              <th rowspan="3">No</th>
+            </tr>
+            <tr>
+              <th colspan="6" class="attendance-date-blank">&nbsp;</th>
+            </tr>
+            <tr>
+              <th class="attendance-col">PAGI</th>
+              <th class="attendance-col">EKSTRA</th>
+              <th class="attendance-col">PAGI</th>
+              <th class="attendance-col">EKSTRA</th>
+              <th class="attendance-col">PAGI</th>
+              <th class="attendance-col">EKSTRA</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${p.students.map((s, i) => `
+              <tr>
+                <td>${p.startIdx + i + 1}</td>
+                <td>${escapeHtml(s.nama)}</td>
+                <td>${escapeHtml(s.kelas)}</td>
+                <td class="attendance-col"><span class="print-square"></span></td>
+                <td class="attendance-col"><span class="print-square"></span></td>
+                <td class="attendance-col"><span class="print-square"></span></td>
+                <td class="attendance-col"><span class="print-square"></span></td>
+                <td class="attendance-col"><span class="print-square"></span></td>
+                <td class="attendance-col"><span class="print-square"></span></td>
+                <td>${p.startIdx + i + 1}</td>
+              </tr>
+            `).join('')}
+            ${p.students.length < 30 ? 
+              Array(30 - p.students.length).fill(0).map((_, i) => `
+              <tr>
+                <td>${p.startIdx + p.students.length + i + 1}</td>
+                <td></td>
+                <td></td>
+                <td class="attendance-col"><span class="print-square"></span></td>
+                <td class="attendance-col"><span class="print-square"></span></td>
+                <td class="attendance-col"><span class="print-square"></span></td>
+                <td class="attendance-col"><span class="print-square"></span></td>
+                <td class="attendance-col"><span class="print-square"></span></td>
+                <td class="attendance-col"><span class="print-square"></span></td>
+                <td>${p.startIdx + p.students.length + i + 1}</td>
+              </tr>
+            `).join('') : ''}
+          </tbody>
+        </table>
+
+          ${idx === allPages.length - 1 ? `
+          <div class="print-paper-footer">
+            <div class="print-signature">
+              <div class="print-signature-label">Mengetahui,</div>
+              <div class="print-signature-line">(_______________________)</div>
+              <div>Pembina Ekskul</div>
+            </div>
+          </div>
+          ` : ''}
+        </div>
+      `).join('');
+
+      document.getElementById('printAbsensiListView').style.display = 'none';
+      document.getElementById('printAbsensiPreviewView').style.display = 'block';
+    }
+
   } catch (err) {
-    showStatus("Error: " + err.message, "error");
+    showStatus('Error: ' + err.message, 'error');
   }
   showLoading(false);
 }
-// ===== UTILS =====
+
+
 function escapeHtml(text) {
   const div = document.createElement("div");
   div.textContent = text || "";

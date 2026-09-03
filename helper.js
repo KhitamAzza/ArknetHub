@@ -77,11 +77,11 @@ async function loadTelatStudents() {
   try {
     const today = getJakartaDateString();
     const { data: attRows, error: attErr } = await sb
-      .from('Attendance')
-      .select('student_id')
-      .eq('date', today)
-      .eq('semester', currentSemester)
-      .eq('status', 'TELAT');
+  .from('AttendanceV2')
+  .select('student_id')
+  .eq('date', today)
+  .eq('semester', currentSemester)
+  .eq('status', 'TELAT');
 
     if (attErr) throw attErr;
 
@@ -288,10 +288,9 @@ async function submitLateRecord() {
         .maybeSingle();
 
       if (found) {
-        inserts.push({
+          inserts.push({
           student_id: found.id,
           date: today,
-          period: 'PAGI',
           semester: currentSemester,
           status: 'TELAT'
         });
@@ -299,7 +298,7 @@ async function submitLateRecord() {
     }
 
     if (inserts.length > 0) {
-      const { error } = await sb.from('Attendance').insert(inserts);
+      const { error } = await sb.from('AttendanceV2').insert(inserts);
       if (error) throw error;
     }
 

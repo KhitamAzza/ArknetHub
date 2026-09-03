@@ -10,14 +10,15 @@
   <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="facescan.css">
-  <link rel="stylesheet" href="helper.css">
+    <link rel="stylesheet" href="helper.css">
   <link rel="stylesheet" href="admin.css">
   <link rel="stylesheet" href="ketua.css">
   <link rel="stylesheet" href="tatib.css">
   <link rel="stylesheet" href="overseer.css">
 
   <base target="_blank">
+<base target="_blank">
+<base target="_blank">
 </head>
 <body>
 
@@ -28,8 +29,7 @@
   <div class="login-subtitle">1 Platform untuk berbagai kebutuhan ekstrakurikuler</div>
   <input type="password" id="passwordInput" class="login-input" placeholder="Password" autocomplete="off" inputmode="verbatim">
          <button class="login-btn" onclick="doLogin()">Masuk</button>
-  <button class="login-btn" style="margin-top:12px;background:linear-gradient(135deg,#10b981,#059669);box-shadow:0 4px 15px rgba(16,185,129,0.3);" onclick="showKetuaLogin()">🔑 Login Ketua</button>
-  <div class="login-error" id="loginError">❌ Password salah</div>
+    <div class="login-error" id="loginError">❌ Password salah</div>
 </div>
 
 <!-- DASHBOARD (Pembina) -->
@@ -40,10 +40,10 @@
     <div class="school-name">di portal Ekstrakurikuler<br>SMK Diponegoro Tumpang</div>
   </div>
   <div class="dashboard-grid">
-    <div class="dash-btn" onclick="showAbsenMenu()">
-      <div class="dash-icon">📋</div>
-      <div class="dash-label">Absen Siswa</div>
-    </div>
+    <div class="dash-btn" onclick="showPaperScreen()">
+  <div class="dash-icon">📷</div>
+  <div class="dash-label">Upload Absensi</div>
+</div>
     <div class="dash-btn" id="regDashBtn" onclick="showRegistration()">
       <div class="dash-icon">📝</div>
       <div class="dash-label">Pendaftaran Ekskul</div>
@@ -67,7 +67,249 @@
     </div>
   </div>
 </div>
+<!-- PAPER SCREEN (Pembina) -->
+<div id="paperScreen" style="display:none;">
+  <div class="app-header">
+    <button class="icon-btn" onclick="backToDashboardFromPaper()">◀</button>
+    <div class="operator-info" style="flex:1;margin-left:12px;">
+      <div class="operator-name">Cetak & Upload Absensi</div>
+      <div class="operator-ekstra" id="paperEkstraLabel">-</div>
+    </div>
+  </div>
+  
+  <div class="paper-tabs">
+    <button class="paper-tab active" id="paperTabPrint" onclick="switchPaperTab('print')">🖨️ Cetak</button>
+    <button class="paper-tab" id="paperTabCamera" onclick="switchPaperTab('camera')">📷 Upload</button>
+  </div>
+  
+  <div id="paperPrintSection" style="padding:16px;">
+    <div style="margin-bottom:12px;font-size:13px;color:var(--text-secondary);">
+      Cetak kertas A4 ini, berikan tanda centang manual, lalu upload di tab berikutnya.
+    </div>
+    <div id="paperPageBanner"></div><div id="paperPrintArea" style="background:#fff;color:#000;padding:16px;border-radius:12px;overflow:auto;"></div>
+    <button class="btn-primary" style="width:100%;margin-top:16px;" onclick="printPaper()">🖨️ Cetak A4</button>
+  </div>
+  
+  <div id="paperCameraSection" style="display:none;">
+  <!-- SOURCE SELECTOR -->
+  <div id="paperSourceSelect" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 16px;min-height:0;">
+    <div style="font-size:14px;color:var(--text-secondary);margin-bottom:24px;text-align:center;">Pilih cara upload bukti absensi</div>
+    <div style="display:flex;flex-direction:column;gap:16px;width:100%;max-width:320px;">
+      <button class="submenu-btn" id="paperSourceCameraBtn" onclick="selectPaperSource('camera')" style="padding:28px 24px;border-radius:20px;">
+        <div class="submenu-icon">📷</div>
+        <div class="submenu-desc">Ambil foto langsung</div>
+      </button>
+      <button class="submenu-btn" onclick="selectPaperSource('file')" style="padding:28px 24px;border-radius:20px;">
+        <div class="submenu-icon">🖼️</div>
+        <div class="submenu-desc">Upload foto dari perangkat</div>
+      </button>
+    </div>
+  </div>
 
+  <!-- CAMERA VIEW -->
+  <div id="paperCameraView" style="display:none;width:100%;flex-direction:column;min-height:0;flex:1;">
+    <div class="paper-camera-wrap">
+      <div id="paperCameraBanner" style="display:none;position:absolute;top:8px;left:8px;right:8px;z-index:8;padding:5px 10px;background:rgba(15,23,42,0.82);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid var(--border);border-radius:10px;align-items:center;gap:8px;font-size:12px;color:var(--text);">
+        <span style="font-size:14px;">📄</span>
+        <span style="flex:1;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="paperCameraBannerText">0 lembar</span>
+        <span style="background:var(--accent);color:#fff;font-size:11px;font-weight:800;padding:3px 8px;border-radius:10px;min-width:32px;text-align:center;" id="paperCameraUploadCounter">0/1</span>
+      </div>
+
+      <video id="paperVideo" autoplay playsinline muted></video>
+      <canvas id="paperCaptureCanvas" style="display:none;"></canvas>
+      <button class="paper-camera-switch" onclick="switchPaperCamera()" title="Ganti Kamera">🔄</button>
+      <div class="paper-overlay">
+        <div class="paper-bracket tl"></div>
+        <div class="paper-bracket tr"></div>
+        <div class="paper-bracket bl"></div>
+        <div class="paper-bracket br"></div>
+        <div class="paper-guide-text">Arahkan 4 kotak hitam kertas ke sudut layar</div>
+        <div id="paperExposureBadge" style="display:none;position:absolute;top:12px;left:12px;padding:6px 12px;border-radius:20px;font-size:11px;font-weight:700;backdrop-filter:blur(4px);"></div>
+      </div>
+      <img id="paperPreview" style="display:none;position:absolute;top:0;left:0;z-index:5;width:100%;height:100%;object-fit:contain;">
+    </div>
+  </div>
+
+  <!-- FILE UPLOAD VIEW -->
+  <div id="paperFileView" style="display:none;flex:1;flex-direction:column;align-items:center;justify-content:flex-start;padding:24px 16px;min-height:0;overflow-y:auto;">
+    <input type="file" id="paperFileInput" accept="image/*" style="display:none;" onchange="handlePaperFileSelect(event)">
+    <div id="paperFileDropzone" onclick="document.getElementById('paperFileInput').click()" style="width:100%;max-width:380px;border:2px dashed var(--border);border-radius:20px;padding:48px 24px;text-align:center;cursor:pointer;background:var(--card);transition:all 0.2s;">
+      <div style="font-size:48px;margin-bottom:16px;">🖼️</div>
+      <div style="font-size:16px;font-weight:700;margin-bottom:8px;">Pilih foto dari perangkat</div>
+      <div style="font-size:13px;color:var(--text-secondary);line-height:1.5;">JPG / PNG • Maks 5MB<br>Pastikan 4 kotak hitam di sudut kertas terlihat jelas</div>
+    </div>
+    <div id="paperFilePreviewWrap" style="display:none;width:100%;max-width:420px;margin-top:16px;position:relative;background:var(--card);border-radius:16px;overflow:hidden;">
+      <img id="paperFilePreview" style="width:100%;display:block;">
+    </div>
+  </div>
+
+  <!-- SHARED HINT -->
+  <div id="paperCameraHint" style="display:none;margin-top:6px;padding:0 16px;font-size:12px;text-align:center;color:var(--text-secondary);line-height:1.35;">
+    Arahkan kamera ke kertas. Pastikan 4 kotak hitam terlihat di sudut.
+  </div>
+
+  <!-- SHARED CONTROLS -->
+  <div id="paperCameraControls" style="display:none;flex-direction:row;gap:10px;margin-top:8px;padding:0 16px 12px;justify-content:center;">
+    <button class="btn-primary" id="paperBtnCapture" style="min-width:140px;max-width:220px;flex:0 1 220px;" onclick="capturePaper()">📷 Ambil Foto</button>
+    <button class="btn-secondary" id="paperBtnRetake" style="min-width:100px;max-width:160px;flex:0 1 160px;display:none;" onclick="retakePaper()">🔄 Ulang</button>
+    <button class="btn-primary" id="paperBtnUpload" style="min-width:120px;max-width:180px;flex:0 1 180px;display:none;" onclick="uploadPaper()">⬆️ Upload</button>
+  </div>
+</div>
+</div>
+
+<!-- ADMIN INPUT SCREEN -->
+<div id="adminInputScreen" style="display:none;">
+  <div class="app-header">
+    <button class="icon-btn" onclick="backToAdmin()">◀</button>
+    <div class="operator-info" style="flex:1;margin-left:12px;">
+      <div class="operator-name">Input Absensi</div>
+      <div class="operator-ekstra">Manual per ekskul</div>
+    </div>
+    <button class="admin-input-view-toggle" id="adminInputViewToggleBtn" onclick="toggleAdminInputView()">🖼️ Lihat Foto</button>
+  </div>
+
+  <div class="admin-input-body" id="adminInputBody">
+    <!-- PHOTO COMPARISON PANE -->
+    <div class="admin-input-photo-pane" id="adminInputPhotoPane">
+      <div class="admin-photo-toolbar">
+        <button class="admin-photo-nav-btn" onclick="adminProofShiftDate(-1)" title="Tanggal sebelumnya">‹</button>
+        <button class="admin-photo-date-btn" id="adminPhotoDateLabel" onclick="openAdminProofDatePicker()">-</button>
+        <button class="admin-photo-nav-btn" id="adminPhotoNextBtn" onclick="adminProofShiftDate(1)" title="Tanggal berikutnya">›</button>
+        <div class="admin-photo-toolbar-spacer"></div>
+        <button class="admin-photo-zoom-btn" onclick="adminPhotoZoom(-1)" title="Perkecil">−</button>
+        <button class="admin-photo-zoom-btn" onclick="adminPhotoZoomReset()" title="Reset zoom">⤢</button>
+        <button class="admin-photo-zoom-btn" onclick="adminPhotoZoom(1)" title="Perbesar">+</button>
+      </div>
+      <div class="admin-photo-viewport" id="adminPhotoViewport">
+        <img id="adminPhotoImg" class="admin-photo-img" style="display:none;" draggable="false" alt="Foto bukti absensi">
+        <div class="admin-photo-empty" id="adminPhotoEmptyState">
+          <div class="admin-photo-empty-icon">🖼️</div>
+          <div class="admin-photo-empty-text" id="adminPhotoEmptyText">Pilih ekskul untuk melihat foto</div>
+        </div>
+      </div>
+      <div class="admin-photo-page-bar" id="adminPhotoPageBar" style="display:none;">
+        <button class="admin-photo-nav-btn" id="adminPhotoPagePrevBtn" onclick="adminPhotoShiftPage(-1)" title="Lembar sebelumnya">‹</button>
+        <div class="admin-photo-page-label" id="adminPhotoPageLabel">Lembar 1/1</div>
+        <button class="admin-photo-nav-btn" id="adminPhotoPageNextBtn" onclick="adminPhotoShiftPage(1)" title="Lembar berikutnya">›</button>
+      </div>
+      <div class="admin-photo-ekstra-label" id="adminPhotoEkstraLabel"></div>
+    </div>
+
+    <!-- MANUAL INPUT PANE -->
+    <div class="admin-input-scroll" id="adminInputInputPane">
+      <div class="admin-ekstra-chip-row" id="adminEkstraChipRow"></div>
+
+      <select id="adminInputEkstra" class="sort-select" style="width:100%;padding:14px;border-radius:14px;margin-bottom:12px;" onchange="loadAdminInputList()">
+        <option value="">Pilih Ekskul</option>
+      </select>
+
+      <input type="text" id="adminInputSearch" class="form-input" placeholder="Cari nama siswa..." style="margin-bottom:12px;" oninput="onAdminInputSearch()">
+
+      <button class="btn-secondary" style="width:100%;margin-bottom:12px;" onclick="markAllAdminInputHadir()">✓ Tandai Semua Hadir</button>
+
+      <div id="adminInputList"></div>
+    </div>
+  </div>
+
+  <div class="bottom-bar">
+    <div id="adminInputChangeCount">0 perubahan</div>
+    <button class="btn-send-compact" id="adminInputSaveBtn" onclick="submitAdminInput()" disabled>Simpan</button>
+  </div>
+</div>
+
+<!-- KELOLA ABSENSI SCREEN -->
+<div id="kelolaAbsensiScreen" style="display:none;">
+  <div class="app-header">
+    <button class="icon-btn" onclick="backToAdmin()">◀</button>
+    <div class="operator-info" style="flex:1;margin-left:12px;">
+      <div class="operator-name">Kelola Absensi</div>
+      <div class="operator-ekstra">Pilih menu</div>
+    </div>
+  </div>
+
+  <div class="kelola-absensi-menu">
+    <div class="kelola-menu-btn" onclick="showPrintAbsensi()">
+      <div class="kelola-menu-icon">🖨️</div>
+      <div class="kelola-menu-label">Print Absensi</div>
+      <div class="kelola-menu-desc">Cetak kertas absensi per ekskul</div>
+    </div>
+    <div class="kelola-menu-btn" onclick="showProofViewer()">
+      <div class="kelola-menu-icon">🖼️</div>
+      <div class="kelola-menu-label">Bukti Digital Absensi</div>
+      <div class="kelola-menu-desc">Lihat foto upload pembina</div>
+    </div>
+  </div>
+</div>
+
+<!-- PRINT ABSENSI SCREEN -->
+<div id="printAbsensiScreen" style="display:none;">
+  <div class="app-header">
+    <button class="icon-btn" onclick="backToKelolaAbsensi()">◀</button>
+    <div class="operator-info" style="flex:1;margin-left:12px;">
+      <div class="operator-name">Print Absensi</div>
+      <div class="operator-ekstra">Cetak kertas absensi</div>
+    </div>
+  </div>
+
+  <div class="print-absensi-scroll">
+    <!-- Ekstra List View -->
+    <div id="printAbsensiListView">
+      <div style="padding:16px 16px 8px;font-size:13px;color:var(--text-secondary);font-weight:600;">
+        Pilih ekskul untuk dicetak
+      </div>
+      <div id="printAbsensiList"></div>
+
+      <div style="padding:16px;">
+        <button class="btn-primary" style="width:100%;" onclick="printAllAbsensi()">
+          🖨️ Buat Seluruh Absensi
+        </button>
+      </div>
+    </div>
+
+    <!-- Print Preview View -->
+    <div id="printAbsensiPreviewView" style="display:none;">
+      <div id="printAbsensiPreviewArea"></div>
+      <div style="padding:16px;display:flex;gap:10px;">
+        <button class="btn-secondary" style="flex:1;" onclick="backToPrintAbsensiList()">◀ Kembali</button>
+        <button class="btn-primary" style="flex:1;" onclick="savePrintAbsensiPDF()">💾 Simpan PDF</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PROOF VIEWER SCREEN -->
+<div id="proofViewerScreen" style="display:none;">
+  <div class="app-header">
+    <button class="icon-btn" onclick="backProofViewer()">◀</button>
+    <div class="operator-info" style="flex:1;margin-left:12px;">
+      <div class="operator-name">Bukti Absensi</div>
+      <div class="operator-ekstra" id="proofViewerSubtitle">Pilih tanggal</div>
+    </div>
+  </div>
+  
+  <div class="proof-scroll" id="proofViewerContent">
+    <!-- Level 1: Date list -->
+    <div id="proofDateListView">
+      <div style="padding:16px 16px 8px;font-size:13px;color:var(--text-secondary);font-weight:600;">
+        Tanggal tersedia
+      </div>
+      <div id="proofDateList"></div>
+    </div>
+    
+    <!-- Level 2: Ekskul list for selected date -->
+    <div id="proofEkstraListView" style="display:none;">
+      <div style="padding:16px 16px 8px;font-size:13px;color:var(--text-secondary);font-weight:600;">
+        Ekskul &mdash; <span id="proofEkstraDateLabel">-</span>
+      </div>
+      <div id="proofEkstraList"></div>
+    </div>
+    
+    <!-- Level 3: Photo detail -->
+    <div id="proofPhotoView" style="display:none;padding:16px;">
+      <div id="proofPhotoContent"></div>
+    </div>
+  </div>
+</div>
 <!-- ADMIN DASHBOARD -->
 <div id="adminScreen" style="display:none;">
   <div class="dashboard-header">
@@ -76,10 +318,15 @@
     <div class="school-name">SMK Diponegoro Tumpang</div>
   </div>
   <div class="dashboard-grid admin-grid">
-    <div class="dash-btn" onclick="showAdminAbsen()">
+    <div class="dash-btn" onclick="showAdminInput()">
+  <div class="dash-icon">📝</div>
+  <div class="dash-label">Input Absensi</div>
+  <div class="dash-desc">Manual per ekskul</div>
+</div>
+<div class="dash-btn" onclick="showKelolaAbsensi()">
       <div class="dash-icon">📋</div>
-      <div class="dash-label">Absen Siswa</div>
-      <div class="dash-desc">Semua siswa</div>
+      <div class="dash-label">Kelola Absensi</div>
+      <div class="dash-desc">Cetak & bukti digital</div>
     </div>
     <div class="dash-btn" onclick="showFixerMode()">
       <div class="dash-icon">🔧</div>
@@ -398,27 +645,6 @@
   </div>
 </div>
 
-<!-- ABSEN SUBMENU -->
-<div id="absenMenuScreen">
-  <div class="submenu-header">
-    <button class="icon-btn" onclick="backToDashboard()">◀</button>
-    <div class="submenu-title">Pilih metode absen</div>
-    <div style="width:40px;"></div>
-  </div>
-  <div class="submenu-buttons">
-    <button class="submenu-btn" onclick="showFaceID()">
-      <div class="submenu-icon">📷</div>
-      <div>Face ID</div>
-      <div class="submenu-desc">Absen dengan scan wajah</div>
-    </button>
-    <button class="submenu-btn" onclick="showReelAttendance()">
-      <div class="submenu-icon">✋</div>
-      <div>Manual Input</div>
-      <div class="submenu-desc">Absen dengan pilih nama</div>
-    </button>
-  </div>
-</div>
-
 <!-- REGISTRATION SCREEN -->
 <div id="registrationScreen">
   <div class="reg-header">
@@ -489,22 +715,7 @@
       <div class="stat-sub" id="subBelum">0%</div>
     </div>
   </div>
-
-  <!-- REEL AREA -->
-  <div class="reel-area">
-    <button class="nav-arrow nav-left" onclick="prevStudent()">◀</button>
-    
-    <div class="reel-container" id="reelContainer">
-      <div class="empty-state" id="emptyState">
-        <div class="empty-state-icon">📭</div>
-        <div class="empty-state-text">Tidak ada data siswa</div>
-      </div>
-    </div>
-    
-    <button class="nav-arrow nav-right" onclick="nextStudent()">▶</button>
-  </div>
-
-  
+ 
   <!-- BOTTOM BAR -->
     <!-- BOTTOM BAR -->
   <div class="bottom-bar">
@@ -655,8 +866,6 @@
     <button class="btn-send-compact" id="syaratSaveBtn" onclick="submitSyaratChanges()" disabled>Simpan</button>
   </div>
 </div>
-
-
 <!-- PENGajuan DANA MODAL -->
 <div id="danaModal" class="modal-overlay">
   <div class="modal-sheet">
@@ -722,107 +931,6 @@
     <div class="dana-loading-text">Memuat pengajuan dana...</div>
   </div>
 </div>
-<!-- FACE SCAN SCREEN -->
-<div id="faceScanScreen" style="display:none;">
-  <!-- Header -->
-  <div class="face-scan-header">
-    <button class="icon-btn" onclick="safeBackFromFaceScan()" title="Kembali">◀</button>
-    <div class="face-scan-title">📷 Face ID Absensi</div>
-    <button class="icon-btn" onclick="showFaceScanList()" title="Daftar">📋</button>
-  </div>
-
-  <!-- Stats Bar -->
-  <div class="face-stats-bar" id="faceStatsBar">
-    <div class="face-stat-card">
-      <div class="face-stat-label">TOTAL</div>
-      <div class="face-stat-value" id="faceStatTotal">0</div>
-    </div>
-    <div class="face-stat-card sheet">
-      <div class="face-stat-label">SUDAH ABSEN</div>
-      <div class="face-stat-value" id="faceStatSudahSheet">0</div>
-    </div>
-    <div class="face-stat-card scan">
-      <div class="face-stat-label">BARU SCAN</div>
-      <div class="face-stat-value" id="faceStatSudah">0</div>
-    </div>
-    <div class="face-stat-card belum">
-      <div class="face-stat-label">BELUM</div>
-      <div class="face-stat-value" id="faceStatBelum">0</div>
-    </div>
-  </div>
-
-  <!-- Camera Area -->
-  <div class="face-camera-area">
-    <video id="faceVideo" autoplay playsinline muted></video>
-    <canvas id="faceCanvas"></canvas>
-    <div class="face-scan-ribbon" id="faceScanRibbon"></div>
-    <button class="face-cam-switch" id="faceBtnSwitchCam" onclick="switchFaceCamera()" title="Ganti Kamera">🔄</button>
-    <div class="face-camera-hint">Arahkan wajah ke kamera</div>
-  </div>
-
-  <!-- Scanned List -->
-  <div class="face-scanned-area">
-    <div class="face-scanned-header">📋 Siswa Terdeteksi</div>
-    <div class="face-scanned-list" id="faceScannedList"></div>
-    <div class="face-scanned-empty" id="faceEmptyScanned" style="display:none;">
-      Belum ada siswa terdeteksi
-    </div>
-  </div>
-
-  <!-- Bottom Bar -->
-  <div class="face-bottom-bar">
-    <button class="face-btn-batal" id="faceBtnBatal" onclick="batalFaceScan()">Batal</button>
-    <button class="face-btn-simpan" id="faceBtnSimpan" onclick="submitFaceScans()">
-      💾 Simpan Absensi
-    </button>
-  </div>
-
-  <!-- Loading Overlay -->
-  <div id="faceLoadingOverlay">
-    <div class="spinner"></div>
-    <div class="face-loading-text" id="faceLoadingText">Memuat...</div>
-  </div>
-
-  <!-- DESKTOP VERIFICATION PANEL (student-facing) — MOVED OUTSIDE HEADER -->
-  <div class="verify-panel" id="verifyPanel">
-    <div class="verify-toggle-wrap">
-      <button class="verify-toggle active" id="verifyToggleList" onclick="setVerifyMode('list')">📋 List</button>
-      <button class="verify-toggle" id="verifyTogglePhoto" onclick="setVerifyMode('photo')">🖼️ Photo</button>
-    </div>
-    
-    <div class="verify-content" id="verifyContentList">
-      <div class="verify-panel-title">✅ Siswa Terdeteksi</div>
-      <div class="verify-list-large" id="verifyListLarge">
-        <div class="verify-empty"><div class="verify-empty-icon">📭</div><div>Belum ada siswa terdeteksi</div></div>
-      </div>
-    </div>
-    
-    <div class="verify-content" id="verifyContentPhoto" style="display:none;">
-      <div class="verify-panel-title">✅ Siswa Terdeteksi</div>
-      <div class="verify-photo-stage" id="verifyPhotoStage">
-        <div class="verify-photo-empty" id="verifyPhotoEmpty">
-          <div class="verify-empty-icon">👤</div>
-          <div class="verify-empty-text">Arahkan wajah ke kamera</div>
-        </div>
-        <div class="verify-photo-card" id="verifyPhotoCard" style="display:none;">
-          <div class="verify-photo-img-wrap">
-            <img class="verify-photo-img" id="verifyPhotoImg" src="" alt="">
-            <div class="verify-photo-fallback" id="verifyPhotoFallback">👤</div>
-          </div>
-          <div class="verify-photo-info">
-            <div class="verify-photo-name" id="verifyPhotoName">-</div>
-            <div class="verify-photo-class" id="verifyPhotoClass">-</div>
-            <div class="verify-photo-ekstra" id="verifyPhotoEkstra">-</div>
-            <div class="verify-photo-status" id="verifyPhotoStatus">HADIR</div>
-            <button class="verify-photo-remove" id="verifyPhotoRemove" onclick="removeCurrentVerifyPhoto()" style="display:none;">
-              <span>✕</span> Hapus (Mismatch)
-              </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
 
 <!-- ===== HELPER / PANITIA DASHBOARD ===== -->
 <div id="helperScreen" style="display:none;">
@@ -843,36 +951,6 @@
     </div>
   </div>
 </div>
-<!-- ===== KETUA EKSKUL DASHBOARD ===== -->
-<div id="ketuaScreen" style="display:none;">
-  <div class="ketua-dashboard">
-    <div class="ketua-header">
-      <div class="ketua-badge">Ketua Ekskul</div>
-      <div class="ketua-title" id="ketuaEkskulName">-</div>
-      <div class="ketua-subtitle">SMK Diponegoro Tumpang</div>
-    </div>
-    
-    <div class="ketua-actions">
-      <button class="ketua-card" onclick="showKetuaAbsen()">
-        <div class="ketua-card-icon">📋</div>
-        <div class="ketua-card-body">
-          <div class="ketua-card-label">Absen Siswa</div>
-          <div class="ketua-card-desc">Catat kehadiran anggota ekskul</div>
-        </div>
-        <div class="ketua-card-arrow">›</div>
-      </button>
-      
-      <button class="ketua-card logout" onclick="doLogout()">
-        <div class="ketua-card-icon">🚪</div>
-        <div class="ketua-card-body">
-          <div class="ketua-card-label">Keluar</div>
-          <div class="ketua-card-desc">Kembali ke halaman login</div>
-        </div>
-        <div class="ketua-card-arrow">›</div>
-      </button>
-    </div>
-  </div>
-</div>
 
 <!-- TATIB DASHBOARD -->
 <div id="tatibScreen" style="display:none;">
@@ -887,16 +965,21 @@
       <div class="dash-label">Pembayaran Denda</div>
     </div>
     <div class="dash-btn" onclick="showTatibBermasalah()">
-  <div class="dash-icon">🚨</div>
-  <div class="dash-label">Siswa Bermasalah</div>
-</div>
+      <div class="dash-icon">🚨</div>
+      <div class="dash-label">Siswa Bermasalah</div>
+    </div>
+    <!-- NEW BUTTON -->
+    <div class="dash-btn" onclick="showProofViewer()">
+      <div class="dash-icon">🖼️</div>
+      <div class="dash-label">Bukti Digital Absensi</div>
+    </div>
+    <!-- END NEW -->
     <div class="dash-btn logout" onclick="doLogout()">
       <div class="dash-icon">🚪</div>
       <div class="dash-label">Keluar</div>
     </div>
   </div>
 </div>
-
 <!-- TATIB PAYMENT SCREEN (Full Page List) -->
 <div id="tatibPaymentScreen" style="display:none;">
   <div class="app-header">
@@ -1116,48 +1199,53 @@
     </div>
   </div>
 </div>
-<!-- KETUA LOGIN MODAL -->
-<div id="ketuaLoginModal" class="modal-overlay">
-  <div class="modal-sheet" style="max-width:320px;">
-    <div class="modal-header">
-      <div class="modal-title">🔑 Login Ketua</div>
-      <button class="icon-btn" onclick="closeKetuaLogin()">✕</button>
-    </div>
-    <div class="modal-body" style="padding:20px;display:flex;flex-direction:column;align-items:center;">
-      <div id="ketuaCodeDisplay" style="width:100%;padding:14px;border-radius:14px;background:var(--bg);border:1px solid var(--border);font-size:32px;font-weight:800;text-align:center;letter-spacing:10px;color:var(--text);margin-bottom:20px;font-variant-numeric:tabular-nums;">----</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;width:100%;margin-bottom:16px;">
-        <button class="numpad-btn" onclick="ketuaNumpad('1')">1</button>
-        <button class="numpad-btn" onclick="ketuaNumpad('2')">2</button>
-        <button class="numpad-btn" onclick="ketuaNumpad('3')">3</button>
-        <button class="numpad-btn" onclick="ketuaNumpad('4')">4</button>
-        <button class="numpad-btn" onclick="ketuaNumpad('5')">5</button>
-        <button class="numpad-btn" onclick="ketuaNumpad('6')">6</button>
-        <button class="numpad-btn" onclick="ketuaNumpad('7')">7</button>
-        <button class="numpad-btn" onclick="ketuaNumpad('8')">8</button>
-        <button class="numpad-btn" onclick="ketuaNumpad('9')">9</button>
-        <button class="numpad-btn" onclick="ketuaNumpad('C')" style="color:var(--red);">C</button>
-        <button class="numpad-btn" onclick="ketuaNumpad('0')">0</button>
-        <button class="numpad-btn" onclick="ketuaNumpad('DEL')" style="color:var(--yellow);">⌫</button>
-      </div>
-      <button class="btn-primary" style="width:100%;" onclick="doKetuaLogin()">Masuk</button>
-    </div>
-  </div>
-</div>
 
 <!-- SCRIPTS -->
 <script src="main.js"></script>
 <script src="utils.js"></script>
-<script src="reel.js"></script>
 <script src="registration.js"></script>
+<script src="paper.js"></script>
 <script src="daftar.js"></script>
 <script src="syarat.js"></script>
 <script src="dana.js"></script>
-<script src="facescan.js"></script>
 <script src="helper.js"></script>
 <script src="admin.js"></script>
 <script src="tatib.js"></script>
 <script src="overseer.js"></script>
 
+
+<!-- ADMIN INPUT STATUS PICKER -->
+<div id="adminInputPickerModal" class="modal-overlay">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title">Pilih Status</div>
+      <button class="icon-btn" onclick="closeAdminInputPicker()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="admin-picker-grid">
+        <button class="admin-picker-btn status-kosong" onclick="pickAdminStatus('')">KOSONG</button>
+        <button class="admin-picker-btn status-hadir" onclick="pickAdminStatus('HADIR')">HADIR</button>
+        <button class="admin-picker-btn status-alpha" onclick="pickAdminStatus('ALPHA')">ALPHA</button>
+        <button class="admin-picker-btn status-terlambat" onclick="pickAdminStatus('TERLAMBAT')">TERLAMBAT</button>
+        <button class="admin-picker-btn status-izin" onclick="pickAdminStatus('IZIN')">IZIN</button>
+        <button class="admin-picker-btn status-sakit" onclick="pickAdminStatus('SAKIT')">SAKIT</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN INPUT PHOTO DATE PICKER -->
+<div id="adminProofDateModal" class="modal-overlay">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title">Pilih Tanggal Foto</div>
+      <button class="icon-btn" onclick="closeAdminProofDateModal()">✕</button>
+    </div>
+    <div class="modal-body" style="max-height:60vh;overflow-y:auto;padding:8px 0;">
+      <div id="adminProofDateModalList"></div>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
