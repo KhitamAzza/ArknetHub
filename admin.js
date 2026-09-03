@@ -109,7 +109,7 @@ async function selectFixerStudent(nama) {
     
         const { data: attendance, error: attError } = await sb
   .from('AttendanceV2')
-  .select('date, status')
+  .select('id, date, status')
   .eq('student_id', student.id)
   .eq('semester', currentSemester)
   .order('date', { ascending: false });
