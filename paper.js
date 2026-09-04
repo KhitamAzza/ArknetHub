@@ -717,6 +717,40 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+// Reads a File into an <img>, retrying the FULL read (not just the decode)
+// before giving up. On Android, files coming from content providers (Google
+// Photos cloud items, WhatsApp media, a photo just taken and not yet fully
+// synced) can hand back truncated/corrupt bytes on the very first access —
+// the provider hasn't finished materializing the file yet. Re-decoding the
+// same already-corrupt bytes never helps, so each attempt here re-reads the
+// file from scratch via a fresh object URL, with a growing delay to give the
+// content provider time to finish.
+function readFileAsImageRobust(file, attempts = 3) {
+  return new Promise((resolve, reject) => {
+    let tries = 0;
+    function attempt() {
+      tries++;
+      const objectUrl = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        resolve(img);
+        // Revoke after the caller has had a chance to draw it to canvas.
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        if (tries < attempts) {
+          setTimeout(attempt, 300 * tries); // 300ms, then 600ms
+        } else {
+          reject(new Error('Gagal memproses gambar (kemungkinan file belum selesai tersinkron, coba lagi)'));
+        }
+      };
+      img.src = objectUrl;
+    }
+    attempt();
+  });
+}
+
 // Loads a data URL into an <img>, retrying once before giving up. Decoding a
 // full-resolution phone photo (often 3000x4000+) can fail once under memory
 // pressure on weaker Android devices — a short pause + retry usually succeeds
@@ -821,14 +855,7 @@ async function handlePaperFileSelect(event) {
   
   showLoading(true);
   try {
-    const dataUrl = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload  = e => resolve(e.target.result);
-      reader.onerror = () => reject(new Error('Gagal membaca file dari perangkat'));
-      reader.readAsDataURL(file);
-    });
-    
-    const img = await loadImageRobust(dataUrl);
+    const img = await readFileAsImageRobust(file);
     
     const maxW = 1200;
     let w = img.width, h = img.height;
