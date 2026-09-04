@@ -33,10 +33,10 @@ const SHELL_ASSETS = [
   './overseer.js',
 
   // Icons
-  './icons/icon-192.png',
-  './icons/icon-512.png',
-  './icons/icon-maskable-192.png',
-  './icons/icon-maskable-512.png',
+  '.ArknetHub-192.png',
+  '.ArknetHub-512.png',
+  '.ArknetHub-192.png',
+  '.ArknetHub-512.png',
 ];
 
 // --- INSTALL: pre-cache the app shell ---
