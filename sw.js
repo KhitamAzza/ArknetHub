@@ -31,12 +31,11 @@ const SHELL_ASSETS = [
   './admin.js',
   './tatib.js',
   './overseer.js',
+  './navigation.js',
 
   // Icons
-  '.ArknetHub-192.png',
-  '.ArknetHub-512.png',
-  '.ArknetHub-192.png',
-  '.ArknetHub-512.png',
+  './ArknetHub-192.png',
+  './ArknetHub-512.png',
 ];
 
 // --- INSTALL: pre-cache the app shell ---
