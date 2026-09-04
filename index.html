@@ -26,7 +26,7 @@
 
 <!-- LOGIN -->
 <div id="loginScreen">
-  <div class="login-logo">📋</div>
+  <div class="login-logo"><img src="icons/Arknet_logo.png" alt=""></div>
   <div class="login-title">ArkNet Hub</div>
   <div class="login-subtitle">1 Platform untuk berbagai kebutuhan ekstrakurikuler</div>
   <input type="password" id="passwordInput" class="login-input" placeholder="Password" autocomplete="off" inputmode="verbatim">
@@ -1212,29 +1212,6 @@
   <button class="install-banner-btn" id="installBannerBtn">Install</button>
   <button class="install-banner-close" id="installBannerClose">✕</button>
 </div>
-
-<!-- SCRIPTS -->
-<script src="main.js"></script>
-<script src="utils.js"></script>
-<script src="registration.js"></script>
-<script src="paper.js"></script>
-<script src="daftar.js"></script>
-<script src="syarat.js"></script>
-<script src="dana.js"></script>
-<script src="helper.js"></script>
-<script src="admin.js"></script>
-<script src="tatib.js"></script>
-<script src="overseer.js"></script>
-<script src="navigation.js"></script>
-
-<script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch(console.error);
-    });
-  }
-</script>
-
 <!-- ADMIN INPUT STATUS PICKER -->
 <div id="adminInputPickerModal" class="modal-overlay">
   <div class="modal-sheet">
@@ -1267,6 +1244,30 @@
     </div>
   </div>
 </div>
+
+<!-- SCRIPTS -->
+<script src="main.js"></script>
+<script src="utils.js"></script>
+<script src="registration.js"></script>
+<script src="paper.js"></script>
+<script src="daftar.js"></script>
+<script src="syarat.js"></script>
+<script src="dana.js"></script>
+<script src="helper.js"></script>
+<script src="admin.js"></script>
+<script src="tatib.js"></script>
+<script src="overseer.js"></script>
+<script src="navigation.js"></script>
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(console.error);
+    });
+  }
+</script>
+
+
 
 </body>
 </html>

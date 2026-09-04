@@ -37,7 +37,13 @@ html, body {
   background: var(--bg);
 }
 
-.login-logo { font-size: 64px; margin-bottom: 16px; filter: drop-shadow(0 0 20px var(--accent)); }
+.login-logo {
+  width: 200px;          /* Adjust to your desired size */
+  height: auto;          /* Maintains aspect ratio */
+  display: block;        /* Removes extra inline spacing */
+  margin-bottom: 0;
+  filter: drop-shadow(0 0 20px var(--accent));
+}
 .login-title { font-size: 28px; font-weight: 800; margin-bottom: 6px; text-align: center; letter-spacing: -0.5px; }
 .login-subtitle { color: var(--text-secondary); margin-bottom: 40px; text-align: center; font-size: 15px; }
 
