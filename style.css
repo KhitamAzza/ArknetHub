@@ -1918,3 +1918,41 @@ paperCameraSection {
   transform: scale(0.97);
   background: var(--border);
 }
+.install-banner {
+  display: none;
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 999;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--card, #1e293b);
+  border: 1px solid var(--border, #334155);
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+}
+.install-banner.show { display: flex; }
+.install-banner-icon { font-size: 24px; }
+.install-banner-text { flex: 1; min-width: 0; }
+.install-banner-title { font-size: 13px; font-weight: 700; color: var(--text, #f1f5f9); }
+.install-banner-sub { font-size: 11px; color: var(--text-secondary, #94a3b8); }
+.install-banner-btn {
+  background: var(--accent, #6366f1);
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.install-banner-close {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary, #94a3b8);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px;
+}

@@ -667,3 +667,44 @@ function getDefaultConfig() {
         currentSemester: 'STS (Ganjil)'
     };
 }
+(function () {
+  const STORAGE_KEY = 'arknet_install_prompt_shown';
+  let deferredPrompt = null;
+
+  function isStandalone() {
+    return window.matchMedia('(display-mode: standalone)').matches
+      || window.navigator.standalone === true; // iOS Safari
+  }
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+
+    if (isStandalone()) return;              // already installed, never show
+    if (localStorage.getItem(STORAGE_KEY)) return; // already shown once, never again
+
+    document.getElementById('installBanner').classList.add('show');
+  });
+
+  document.getElementById('installBannerBtn')?.addEventListener('click', async () => {
+    const banner = document.getElementById('installBanner');
+    banner.classList.remove('show');
+    localStorage.setItem(STORAGE_KEY, '1');
+
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+  });
+
+  document.getElementById('installBannerClose')?.addEventListener('click', () => {
+    document.getElementById('installBanner').classList.remove('show');
+    localStorage.setItem(STORAGE_KEY, '1');
+  });
+
+  // If it gets installed some other way (browser's own UI), don't show again either
+  window.addEventListener('appinstalled', () => {
+    localStorage.setItem(STORAGE_KEY, '1');
+    document.getElementById('installBanner')?.classList.remove('show');
+  });
+})();
