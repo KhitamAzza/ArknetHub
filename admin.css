@@ -269,6 +269,7 @@
 .status-hadir { color: var(--green); background: rgba(16, 185, 129, 0.12); }
 .status-terlambat { color: var(--yellow); background: rgba(245, 158, 11, 0.12); }
 .status-pagi { color: var(--accent); background: rgba(59, 130, 246, 0.12); }
+.status-telat {color: var(--yellow);background: rgba(245, 158, 11, 0.12);border: 1px solid rgba(245, 158, 11, 0.2);}
 .status-izin { color: #a78bfa; background: rgba(167, 139, 250, 0.12); }
 .status-sakit { color: #f472b6; background: rgba(244, 114, 182, 0.12); }
 .status-empty { color: var(--text-secondary); background: rgba(255,255,255,0.04); }
@@ -1376,6 +1377,17 @@
   color: var(--yellow);
   background: rgba(245, 158, 11, 0.08);
 }
+.admin-picker-btn.status-pagi {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.admin-picker-btn.status-telat {
+  border-color: var(--yellow);
+  color: var(--yellow);
+  background: rgba(245, 158, 11, 0.08);
+}
 .admin-picker-btn.status-izin {
   border-color: #a78bfa;
   color: #a78bfa;
@@ -2194,4 +2206,26 @@ font-size: 12px;}
     flex: 1;
     min-width: 0;
   }
+}
+/* Attendance submission states on ekstra chips */
+.admin-ekstra-chip.attendance-none {
+  opacity: 0.65;
+}
+
+.admin-ekstra-chip.attendance-partial {
+  border-color: var(--yellow);
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.admin-ekstra-chip.attendance-partial .admin-ekstra-chip-label {
+  color: var(--yellow);
+}
+
+.admin-ekstra-chip.attendance-full {
+  border-color: var(--green);
+  background: rgba(16, 185, 129, 0.12);
+}
+
+.admin-ekstra-chip.attendance-full .admin-ekstra-chip-label {
+  color: var(--green);
 }

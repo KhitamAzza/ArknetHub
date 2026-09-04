@@ -1348,6 +1348,67 @@ function switchConfigTab(tab) {
     if (bottomBar) bottomBar.style.display = 'none';
   }
 }
+async function loadAdminEkstraAttendanceStatus() {
+  const today = todayJakartaDate();
+  try {
+    // 1. How many students per ekstra?
+    const { data: students, error: sErr } = await sb
+      .from('Database')
+      .select('id, ekstra');
+    if (sErr) throw sErr;
+
+    const totalPerEkstra = {};
+    const studentToEkstra = {};
+    (students || []).forEach(s => {
+      const e = (s.ekstra || '').trim();
+      if (e && e !== '0') {
+        totalPerEkstra[e] = (totalPerEkstra[e] || 0) + 1;
+        studentToEkstra[s.id] = e;
+      }
+    });
+
+    // 2. How many attendance rows today?
+    const { data: att, error: aErr } = await sb
+      .from('AttendanceV2')
+      .select('student_id')
+      .eq('date', today)
+      .eq('semester', currentSemester);
+    if (aErr) throw aErr;
+
+    const submittedPerEkstra = {};
+    (att || []).forEach(a => {
+      const e = studentToEkstra[a.student_id];
+      if (e) submittedPerEkstra[e] = (submittedPerEkstra[e] || 0) + 1;
+    });
+
+    // 3. Paint every chip
+    document.querySelectorAll('.admin-ekstra-chip').forEach(chip => {
+      const ekstra = chip.dataset.ekstra;
+      const total = totalPerEkstra[ekstra] || 0;
+      const done  = submittedPerEkstra[ekstra] || 0;
+
+      chip.classList.remove('attendance-none', 'attendance-partial', 'attendance-full');
+
+      if (done === 0) {
+        chip.classList.add('attendance-none');
+      } else if (done >= total && total > 0) {
+        chip.classList.add('attendance-full');
+      } else {
+        chip.classList.add('attendance-partial');
+      }
+
+      const label = chip.querySelector('.admin-ekstra-chip-label');
+      if (label) {
+        if (!label.dataset.base) label.dataset.base = label.textContent;
+        label.textContent = done > 0
+          ? `${label.dataset.base} • ${done}/${total}`
+          : label.dataset.base;
+      }
+    });
+  } catch (e) {
+    console.error("Ekstra attendance status failed", e);
+  }
+}
 // ===== ADMIN MANUAL INPUT =====
 let adminInputStudents = [];
 let adminInputChanges = new Map();
@@ -1375,6 +1436,7 @@ async function initAdminInput() {
   }
   renderAdminEkstraChips(Array.from(ekstras).sort());
   loadAdminEkstraUploadStatus();
+  loadAdminEkstraAttendanceStatus();
   adminInputStudents = [];
   adminInputChanges.clear();
   const list = document.getElementById('adminInputList');
@@ -1682,11 +1744,15 @@ document.addEventListener('keydown', (e) => {
       e.preventDefault();
       applyStatusToFocused('TERLAMBAT');
       break;
-    case '4':
+     case '4':
+      e.preventDefault();
+      applyStatusToFocused('PAGI');
+      break;
+    case '5':
       e.preventDefault();
       applyStatusToFocused('IZIN');
       break;
-    case '5':
+    case '6':
       e.preventDefault();
       applyStatusToFocused('SAKIT');
       break;
@@ -1719,7 +1785,7 @@ function cycleAdminInputStatus(id) {
   const student = adminInputStudents.find(s => String(s.id) === String(id));
   if (!student) return;
 
-  const order = ['', 'HADIR', 'ALPHA', 'TERLAMBAT', 'IZIN', 'SAKIT'];
+  const order = ['', 'HADIR', 'ALPHA', 'TERLAMBAT', 'PAGI', 'IZIN', 'SAKIT'];
   const current = adminInputChanges.get(id);
   const currentStatus = current !== undefined ? current : (student.currentStatus || '');
   const idx = order.indexOf(currentStatus);
@@ -1734,8 +1800,10 @@ function getAdminStatusClass(status) {
   if (s === 'HADIR') return 'status-hadir';
   if (s === 'ALPHA') return 'status-alpha';
   if (s === 'TERLAMBAT') return 'status-terlambat';
+  if (s === 'PAGI') return 'status-pagi';
   if (s === 'IZIN') return 'status-izin';
   if (s === 'SAKIT') return 'status-sakit';
+  if (s === 'TELAT') return 'status-telat';   // ← ADD
   return 'status-kosong';
 }
 
@@ -2166,6 +2234,7 @@ async function submitAdminInput() {
     showStatus(`✓ ${upserts.length} data tersimpan`, "ok");
     adminInputChanges.clear();
     loadAdminInputList();
+    loadAdminEkstraAttendanceStatus(); 
   } catch (err) {
     showStatus("Error: " + err.message, "error");
   }
