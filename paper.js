@@ -21,18 +21,56 @@ function showPaperScreen() {
   const el = document.getElementById("paperScreen");
   if (el) {
     el.style.display = "flex";
+    resetPaperUploadState(); // guarantee a clean slate no matter how we got here
     initPaperScreen();
   }
 }
 
-function backToDashboardFromPaper() {
+// Fully clears anything a previous, possibly-interrupted upload attempt
+// could have left behind: captured photo, preview images, camera stream,
+// button states. Safe to call any time — re-running it just re-shows the
+// source selector as if the screen was freshly opened.
+function resetPaperUploadState() {
   stopPaperCamera();
   paperSourceMode = null;
   paperCapturedImage = null;
-  
+
   const fileInput = document.getElementById('paperFileInput');
   if (fileInput) fileInput.value = '';
-  
+
+  const camPreview = document.getElementById('paperPreview');
+  if (camPreview) { camPreview.src = ''; camPreview.style.display = 'none'; }
+
+  const filePreviewWrap = document.getElementById('paperFilePreviewWrap');
+  const filePreview = document.getElementById('paperFilePreview');
+  const dropzone = document.getElementById('paperFileDropzone');
+  if (filePreview) filePreview.src = '';
+  if (filePreviewWrap) filePreviewWrap.style.display = 'none';
+  if (dropzone) dropzone.style.display = 'block';
+
+  const btnCap = document.getElementById('paperBtnCapture');
+  const btnRet = document.getElementById('paperBtnRetake');
+  const btnUpl = document.getElementById('paperBtnUpload');
+  if (btnCap) btnCap.style.display = 'inline-block';
+  if (btnRet) btnRet.style.display = 'none';
+  if (btnUpl) { btnUpl.style.display = 'none'; btnUpl.disabled = false; btnUpl.textContent = '⬆️ Upload'; }
+
+  const controls = document.getElementById('paperCameraControls');
+  if (controls) controls.style.display = 'none';
+}
+
+// Manual "refresh" for the pembina — refetches students/config/counters
+// from Supabase and resets the screen, without a full page reload.
+async function refreshPaperScreen() {
+  showLoading(true);
+  resetPaperUploadState();
+  await initPaperScreen();
+  showLoading(false);
+  showStatus('✓ Halaman diperbarui', 'ok');
+}
+
+function backToDashboardFromPaper() {
+  resetPaperUploadState();
   hideAllScreens();
   showDashboard();
 }
