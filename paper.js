@@ -724,11 +724,14 @@ function escapeHtml(text) {
 // the provider hasn't finished materializing the file yet. Re-decoding the
 // same already-corrupt bytes never helps, so each attempt here re-reads the
 // file from scratch via a fresh object URL, with a growing delay to give the
-// content provider time to finish.
+// content provider time to finish. If every object-URL attempt still fails,
+// a final fallback forces a full read via FileReader, which routes through
+// Android's ContentResolver directly and succeeds in some cases where
+// createObjectURL doesn't (e.g. cloud-only Google Photos items).
 function readFileAsImageRobust(file, attempts = 3) {
   return new Promise((resolve, reject) => {
     let tries = 0;
-    function attempt() {
+    function attemptObjectUrl() {
       tries++;
       const objectUrl = URL.createObjectURL(file);
       const img = new Image();
@@ -740,14 +743,36 @@ function readFileAsImageRobust(file, attempts = 3) {
       img.onerror = () => {
         URL.revokeObjectURL(objectUrl);
         if (tries < attempts) {
-          setTimeout(attempt, 300 * tries); // 300ms, then 600ms
+          setTimeout(attemptObjectUrl, 400 * tries); // 400ms, then 800ms
         } else {
-          reject(new Error('Gagal memproses gambar (kemungkinan file belum selesai tersinkron, coba lagi)'));
+          attemptFileReader();
         }
       };
       img.src = objectUrl;
     }
-    attempt();
+    function attemptFileReader() {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('Gagal memproses gambar (file mungkin rusak atau formatnya tidak didukung)'));
+        img.src = reader.result;
+      };
+      reader.onerror = () => {
+        reject(new Error('Foto masih diproses sistem (baru selesai difoto). Tunggu 5-10 detik lalu coba pilih foto yang sama lagi.'));
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Photos taken moments ago may not be fully written/processed yet
+    // (HDR merge, Google Photos backup starting, etc.) — give it a head
+    // start before the first read attempt instead of failing immediately.
+    const ageMs = Date.now() - (file.lastModified || 0);
+    if (ageMs >= 0 && ageMs < 3000) {
+      setTimeout(attemptObjectUrl, 3000 - ageMs);
+    } else {
+      attemptObjectUrl();
+    }
   });
 }
 
