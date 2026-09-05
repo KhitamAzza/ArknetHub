@@ -550,7 +550,7 @@ function showStatus(message, type) {
   statusOverlay.textContent = message;
   statusOverlay.className = "status-overlay status-" + type;
   statusOverlay.style.opacity = "1";
-  setTimeout(() => { statusOverlay.style.opacity = "0"; }, 1800);
+  setTimeout(() => { statusOverlay.style.opacity = "0"; }, 5000);
 }
 
 function showLoading(show) {
