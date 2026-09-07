@@ -479,44 +479,52 @@ async function selectWaReportDate(date) {
       .select('id, nama, kelas');
     if (studErr) throw studErr;
 
-        // 2. AttendanceV2 for selected date
+    // 2. Attendance for the selected date
     const { data: attendance, error: attErr } = await sb
-      .from('AttendanceV2')          // ← KEEP the V2! This is the table name.
+      .from('AttendanceV2')
       .select('student_id, status')
       .eq('date', date)
       .eq('semester', currentSemester);
     if (attErr) throw attErr;
 
-    const attMap = {};
-    (attendance || []).forEach(a => {   // ← lowercase `attendance` (the variable)
-      attMap[a.student_id] = (a.status || '').trim().toUpperCase();
-    });
+    // Build a Set of student IDs that have a record (ignore their status)
+    const presentIds = new Set((attendance || []).map(a => a.student_id));
 
-    // 3. Convert NULL → ALPHA, TELAT → ALPHA
+    // 3. Process each student
     let emptyCount = 0;
     let telatCount = 0;
 
     const processed = (allStudents || []).map(s => {
-      const raw = attMap[s.id] || '';
-      let status = raw;
+      let status = 'ALPHA';  // default for missing
 
-      if (!status) {
-        status = 'ALPHA';
+      if (presentIds.has(s.id)) {
+        // student has a record, get the actual status
+        const record = attendance.find(a => a.student_id === s.id);
+        const raw = (record?.status || '').trim().toUpperCase();
+        if (raw === 'TELAT') {
+          status = 'ALPHA';
+          telatCount++;
+        } else if (['ALPHA', 'TERLAMBAT', 'PAGI', 'HADIR', 'SAKIT', 'IZIN'].includes(raw)) {
+          // keep the original status (but we will filter later)
+          status = raw;
+        } else {
+          // any other status, treat as ALPHA (fallback)
+          status = 'ALPHA';
+        }
+      } else {
+        // no record → ALPHA
         emptyCount++;
-      } else if (status === 'TELAT') {
-        status = 'ALPHA';
-        telatCount++;
       }
 
       return { ...s, reportStatus: status };
     });
 
-    // 4. Keep only ALPHA, TERLAMBAT, PAGI
+    // 4. Keep only ALPHA, TERLAMBAT, PAGI (as before)
     waReportData = processed.filter(s =>
       ['ALPHA', 'TERLAMBAT', 'PAGI'].includes(s.reportStatus)
     );
 
-    // 5. Build preview HTML (grouped by kelas)
+    // 5. Build preview HTML (same as before)
     const byClass = {};
     waReportData.forEach(s => {
       if (!byClass[s.kelas]) byClass[s.kelas] = [];
@@ -543,7 +551,7 @@ async function selectWaReportDate(date) {
 
     document.getElementById('waReportPreviewContent').innerHTML = previewHtml;
 
-    // 6. Show warning if there are empty/TELAT records
+    // 6. Show warning if there were empty/TELAT records
     if (emptyCount > 0 || telatCount > 0) {
       document.getElementById('waReportDateStep').style.display = 'none';
       document.getElementById('waReportWarning').style.display = 'block';
@@ -554,6 +562,7 @@ async function selectWaReportDate(date) {
     }
   } catch (err) {
     showStatus('Error: ' + err.message, 'error');
+    console.error(err);
   }
 
   showLoading(false);
