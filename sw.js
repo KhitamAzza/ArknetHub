@@ -1,6 +1,6 @@
 // ArkNet Hub — Service Worker
 // Bump CACHE_VERSION on every deploy so old shells get replaced.
-const CACHE_VERSION = 'arknet-hub-v1';
+const CACHE_VERSION = 'arknet-hub-v4';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 
 // App shell: everything needed for the UI to boot and render offline.
@@ -18,6 +18,7 @@ const SHELL_ASSETS = [
   './ketua.css',
   './tatib.css',
   './overseer.css',
+  './denda.css',
 
   // JS
   './main.js',
@@ -32,6 +33,7 @@ const SHELL_ASSETS = [
   './tatib.js',
   './overseer.js',
   './navigation.js',
+  './denda.js',
 
   // Icons
   './ArknetHub-192.png',

@@ -41,6 +41,7 @@ function showTatibScreen() {
 function backToTatib() {
   hideAllScreens();
   showTatibScreen();
+  toggleDendaFab(false);
 }
 
 /* ===== PAYMENT FULL PAGE ===== */
@@ -51,6 +52,7 @@ function showTatibPayment() {
     el.style.display = "flex";
     initTatibPayment();
   }
+  toggleDendaFab(true); // reuses denda.js's FAB — same collected/handed summary as admin sees
 }
 
 async function initTatibPayment() {
@@ -339,12 +341,14 @@ async function submitTatibPayment() {
   try {
     const { error } = await sb
       .from('bayardenda')
+      // note intentionally omitted here so it stays NULL — Denda Diterima
+      // (denda.js) finds pending tatib deposits via .is('note', null),
+      // so an explicit '' would hide this payment from that screen forever.
       .insert({
         student_id: tatibSelectedDebtor.id,
         amount: amount,
         submitter: currentOperator,
-        semester: currentSemester,
-        note: ''
+        semester: currentSemester
       });
 
     if (error) throw error;

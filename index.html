@@ -17,6 +17,7 @@
   <link rel="stylesheet" href="ketua.css">
   <link rel="stylesheet" href="tatib.css">
   <link rel="stylesheet" href="overseer.css">
+  <link rel="stylesheet" href="denda.css">
 
   <base target="_blank">
 <base target="_blank">
@@ -243,6 +244,140 @@
   </div>
 </div>
 
+<!-- PENARIKAN DENDA SISWA — MENU -->
+<div id="penarikanDendaScreen" style="display:none;">
+  <div class="app-header">
+    <button class="icon-btn" onclick="backToAdmin()">◀</button>
+    <div class="operator-info" style="flex:1;margin-left:12px;">
+      <div class="operator-name">Penarikan Denda Siswa</div>
+      <div class="operator-ekstra">Pilih menu</div>
+    </div>
+  </div>
+  <div class="kelola-absensi-menu">
+    <div class="kelola-menu-btn" onclick="showAdminDendaPayment()">
+      <div class="kelola-menu-icon">💰</div>
+      <div class="kelola-menu-label">Pembayaran Denda</div>
+      <div class="kelola-menu-desc">Catat pembayaran denda siswa</div>
+    </div>
+    <div class="kelola-menu-btn" onclick="showDendaDiterima()">
+      <div class="kelola-menu-icon">✅</div>
+      <div class="kelola-menu-label">Denda Diterima</div>
+      <div class="kelola-menu-desc">Konfirmasi setoran dari tatib</div>
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN DENDA PAYMENT SCREEN -->
+<div id="adminDendaPaymentScreen" style="display:none;">
+  <div class="app-header">
+    <button class="icon-btn" onclick="backToPenarikanDendaMenu()">◀</button>
+    <div class="operator-info" style="flex:1;margin-left:12px;">
+      <div class="operator-name">Pembayaran Denda</div>
+      <div class="operator-ekstra">Input pembayaran (Admin)</div>
+    </div>
+  </div>
+
+  <div class="tatib-search-wrap">
+    <input type="text" id="dendaPaymentSearchInput" class="tatib-search-input" placeholder="Cari nama atau kelas..." oninput="onDendaPaymentSearchInput()" autocomplete="off">
+  </div>
+
+  <div class="tatib-debt-list-container" id="dendaPaymentListContainer"></div>
+
+  <div class="empty-state" id="dendaPaymentEmpty" style="display:none;">
+    <div class="empty-state-icon">✅</div>
+    <div class="empty-state-text">Tidak ada siswa dengan denda</div>
+  </div>
+</div>
+
+<!-- ADMIN DENDA PAYMENT MODAL -->
+<div id="dendaPaymentModal" class="modal-overlay">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title">💰 Input Pembayaran</div>
+      <button class="icon-btn" onclick="closeDendaPaymentModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="tatib-detail-header">
+        <div class="tatib-detail-name" id="dendaPayName">-</div>
+        <div class="tatib-detail-class" id="dendaPayClass">-</div>
+      </div>
+
+      <div class="tatib-debt-cards">
+        <div class="tatib-debt-card">
+          <div class="tatib-debt-card-label">Total</div>
+          <div class="tatib-debt-card-value" id="dendaPayTotal">Rp 0</div>
+        </div>
+        <div class="tatib-debt-card">
+          <div class="tatib-debt-card-label">Sudah</div>
+          <div class="tatib-debt-card-value green" id="dendaPayPaid">Rp 0</div>
+        </div>
+        <div class="tatib-debt-card">
+          <div class="tatib-debt-card-label">Sisa</div>
+          <div class="tatib-debt-card-value red" id="dendaPaySisa">Rp 0</div>
+        </div>
+      </div>
+
+      <div class="tatib-section-title">Riwayat Pembayaran</div>
+      <div class="tatib-history-list" id="dendaPayHistory"></div>
+
+      <div class="form-group">
+        <label class="form-label">Jumlah Pembayaran</label>
+        <input type="text" id="dendaPayAmount" class="form-input" placeholder="Rp 0" oninput="formatDendaPayInput(this)">
+        <div class="tatib-pay-hint" id="dendaPayHint">Maksimal: Rp 0</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeDendaPaymentModal()">Batal</button>
+      <button class="btn-primary" id="dendaPaySubmitBtn" onclick="submitAdminDendaPayment()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- DENDA DITERIMA SCREEN -->
+<div id="dendaDiterimaScreen" style="display:none;">
+  <div class="app-header">
+    <button class="icon-btn" onclick="backToPenarikanDendaMenu()">◀</button>
+    <div class="operator-info" style="flex:1;margin-left:12px;">
+      <div class="operator-name">Denda Diterima</div>
+      <div class="operator-ekstra">Konfirmasi setoran dari tatib</div>
+    </div>
+  </div>
+
+  <div class="tatib-search-wrap">
+    <input type="text" id="dendaDiterimaSearchInput" class="tatib-search-input" placeholder="Cari nama atau kelas..." oninput="filterDendaDiterimaList()" autocomplete="off">
+  </div>
+
+  <div class="tatib-debt-list-container" id="dendaDiterimaListContainer"></div>
+
+  <div class="empty-state" id="dendaDiterimaEmpty" style="display:none;">
+    <div class="empty-state-icon">✅</div>
+    <div class="empty-state-text">Tidak ada setoran menunggu konfirmasi</div>
+  </div>
+
+  <div class="denda-context-notif" id="dendaContextNotif" style="display:none;"></div>
+
+  <div class="bottom-bar">
+    <div id="dendaDiterimaCount">0 dipilih</div>
+    <button class="btn-send-compact" id="dendaDiterimaSubmitBtn" onclick="submitDendaDiterima()" disabled>Simpan</button>
+  </div>
+</div>
+
+<!-- DENDA FAB (tatib deposit summary) -->
+<button id="dendaFab" class="denda-fab" onclick="openDendaFabSummary()" style="display:none;" title="Ringkasan Setoran Tatib">💰</button>
+
+<!-- DENDA FAB SUMMARY MODAL -->
+<div id="dendaFabModal" class="modal-overlay">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title">💰 Ringkasan Setoran Tatib</div>
+      <button class="icon-btn" onclick="closeDendaFabModal()">✕</button>
+    </div>
+    <div class="modal-body" style="padding:0;max-height:60vh;overflow-y:auto;">
+      <div id="dendaFabList"></div>
+    </div>
+  </div>
+</div>
+
 <!-- PRINT ABSENSI SCREEN -->
 <div id="printAbsensiScreen" style="display:none;">
   <div class="app-header">
@@ -349,6 +484,11 @@
   <div class="dash-icon">👤</div>
   <div class="dash-label">Kelola Siswa</div>
   <div class="dash-desc">Ubah ekstra & riwayat</div>
+</div>
+    <div class="dash-btn" onclick="showPenarikanDenda()">
+  <div class="dash-icon">💵</div>
+  <div class="dash-label">Penarikan Denda Siswa</div>
+  <div class="dash-desc">Setoran & konfirmasi tatib</div>
 </div>
         <div class="dash-btn logout" onclick="doLogout()">
       <div class="dash-icon">🚪</div>
@@ -1256,6 +1396,7 @@
 <script src="dana.js"></script>
 <script src="helper.js"></script>
 <script src="admin.js"></script>
+<script src="denda.js"></script>
 <script src="tatib.js"></script>
 <script src="overseer.js"></script>
 <script src="navigation.js"></script>

@@ -1,0 +1,115 @@
+/* ============================================
+   denda.css — Penarikan Denda Siswa
+   Reuses existing shared classes where possible
+   (kelola-menu-btn, tatib-search-input, tatib-debt-row,
+   tatib-bm-row/toggle, modal-sheet, bottom-bar) so this
+   file only covers what's genuinely new.
+   ============================================ */
+
+/* ===== CONTEXTUAL FUND NOTIF (Denda Diterima) ===== */
+.denda-context-notif {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: 76px; /* sits just above the bottom-bar */
+  z-index: 40;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  padding: 10px 16px;
+  border-radius: 14px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  animation: dendaNotifIn 0.15s ease-out;
+}
+
+@keyframes dendaNotifIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== FAB ===== */
+.denda-fab {
+  position: fixed;
+  right: 20px;
+  bottom: 24px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+  font-size: 24px;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.4);
+  transition: all 0.15s;
+  z-index: 50;
+}
+
+.denda-fab:active { transform: scale(0.92); }
+
+/* ===== FAB SUMMARY MODAL ===== */
+.denda-fab-row {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.denda-fab-row:last-child { border-bottom: none; }
+
+.denda-fab-name {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.denda-fab-figures {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+.denda-fab-figure {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.denda-fab-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.denda-fab-value {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.denda-fab-value.green { color: var(--green); }
+.denda-fab-value.red { color: var(--red); }
+/* ===== DENDA FULL-SCREEN SCREENS ===== */
+#penarikanDendaScreen,
+#adminDendaPaymentScreen,
+#dendaDiterimaScreen {
+  display: none;
+  flex-direction: column;
+  height: 100dvh;
+  background: var(--bg);
+}
+
+#adminDendaPaymentScreen .tatib-debt-list-container,
+#dendaDiterimaScreen .tatib-debt-list-container {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+#dendaDiterimaScreen .bottom-bar {
+  flex-shrink: 0;
+}
