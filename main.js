@@ -93,8 +93,9 @@ const dashTeacherName = document.getElementById("dashTeacherName");
 const regDashBtn = document.getElementById("regDashBtn");
 
 // ===== GLOBAL SCREEN HIDER =====
+// ===== GLOBAL SCREEN HIDER =====
 function hideAllScreens() {
-    const ids = [
+  const ids = [
     "loginScreen", "dashboardScreen", "mainApp", "listScreen",
     "absenMenuScreen", "registrationScreen", "summaryModal",
     "adminScreen", "helperScreen", "overseerScreen",
@@ -102,18 +103,19 @@ function hideAllScreens() {
     "faceScanScreen", "danaHistoryScreen", "syaratScreen",
     "daftarScreen", "searchOverlay", "ketuaScreen",
     "tatibScreen", "tatibPaymentScreen", "tatibHeatmapScreen",
-    "kelolaSiswaScreen", "tanpaEkstraModal", "expelModal",
-    "paperScreen", "adminInputScreen", "proofViewerScreen",
-    "kelolaAbsensiScreen", "printAbsensiScreen"
+    "tatibBermasalahScreen", "kelolaSiswaScreen", "tanpaEkstraModal",
+    "expelModal", "paperScreen", "adminInputScreen", "proofViewerScreen",
+    "kelolaAbsensiScreen", "printAbsensiScreen",
+    "penarikanDendaScreen", "adminDendaPaymentScreen", "dendaDiterimaScreen"
   ];
   ids.forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = "none";
   });
-  
+
   const tatibModal = document.getElementById("tatibPaymentModal");
   if (tatibModal) tatibModal.classList.remove("visible");
-  
+
   if (summaryModal) summaryModal.classList.remove("visible");
   closeSearch();
 }
