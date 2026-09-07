@@ -81,7 +81,7 @@ async function loadTelatStudents() {
   .select('student_id')
   .eq('date', today)
   .eq('semester', currentSemester)
-  .eq('status', 'TELAT');
+  .eq('status', 'TERLAMBAT');
 
     if (attErr) throw attErr;
 
@@ -292,7 +292,7 @@ async function submitLateRecord() {
           student_id: found.id,
           date: today,
           semester: currentSemester,
-          status: 'TELAT'
+          status: 'TERLAMBAT'
         });
       }
     }

@@ -23,6 +23,26 @@ function parseIndonesianDate(dateStr) {
   return new Date(year, month, day);
 }
 
+// ===== PAGINATION HELPER =====
+// Supabase/PostgREST caps a single request at (usually) 1000 rows.
+// Any plain .select() over a full table/date-range can silently truncate
+// once row counts pass that cap. This helper pages through with .range()
+// until it has everything, so long-running semesters / large student
+// counts don't quietly lose the newest (or any) rows.
+async function fetchAllRows(queryBuilderFn, pageSize = 1000) {
+  let allRows = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await queryBuilderFn(from, from + pageSize - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    allRows = allRows.concat(data);
+    if (data.length < pageSize) break; // last page
+    from += pageSize;
+  }
+  return allRows;
+}
+
 async function initOverseer() {
   overseerSelectedDate = null;
   overseerStats = {};
@@ -41,26 +61,49 @@ function toggleAlphaCard() {
 async function loadOverseerDates() {
   showLoading(true);
   try {
-    const { data, error } = await sb
-      .from('AttendanceV2')
-      .select('date')
-      .eq('semester', currentSemester);
+    // DEFENSIVE FIX: `currentSemester` is only as fresh as the last time
+    // loadSupabaseConfig() ran. If Overseer is opened without that having
+    // happened yet in this session (or the Config value was changed
+    // elsewhere), this query filters on a stale/wrong semester string and
+    // silently misses rows that were written under the real current value —
+    // which looks exactly like "a specific date just isn't showing up."
+    // Re-pulling config here keeps currentSemester in sync every time the
+    // date list is loaded.
+    await loadSupabaseConfig();
 
-    if (error) throw error;
+    // Paginate instead of a single unbounded select, so dates near the end
+    // of the result set don't get silently dropped once row counts are large.
+    const rows = await fetchAllRows((from, to) =>
+      sb
+        .from('AttendanceV2')
+        .select('date')
+        .eq('semester', currentSemester)
+        .range(from, to)
+    );
 
-    const uniqueDates = [...new Set((data || []).map(d => d.date))];
+    const uniqueDates = [...new Set(rows.map(d => d.date))];
 
-    // Ensure today is always available even if no AttendanceV2 has been recorded yet
-    const today = getJakartaDateString();
-    if (!uniqueDates.includes(today)) {
-      uniqueDates.push(today);
-    }
+    // NOTE: we intentionally do NOT force-add "today" here anymore.
+    // This picker should only ever show dates that actually have
+    // AttendanceV2 rows — injecting today's date when it has zero
+    // records was creating a misleading empty entry in the list.
+    // (The WA report modal has its own separate date list and still
+    // needs today selectable even with no data yet — see openWaReportModal.)
 
     uniqueDates.sort((a, b) => parseIndonesianDate(b) - parseIndonesianDate(a));
 
-    overseerDates = uniqueDates;
-    overseerSelectedDate = uniqueDates[0]; // defaults to today (or most recent)
-    await loadOverseerStats(overseerSelectedDate);
+    // Only track the 3 most recent dates — older ones roll off automatically
+    // as new ones appear, so the picker always shows the latest activity.
+    const MAX_TRACKED_DATES = 3;
+    overseerDates = uniqueDates.slice(0, MAX_TRACKED_DATES);
+
+    if (overseerDates.length === 0) {
+      overseerSelectedDate = null;
+      renderOverseerEmpty();
+    } else {
+      overseerSelectedDate = overseerDates[0]; // most recent real date with data
+      await loadOverseerStats(overseerSelectedDate);
+    }
   } catch (err) {
     console.error(err);
     showStatus("Gagal memuat data", "error");
@@ -197,13 +240,15 @@ async function loadOverseerAlpha() {
   if (container) container.innerHTML = '<div class="overseer-empty">Memuat...</div>';
 
   try {
-      const { data: alphaRows, error: alphaErr } = await sb
-    .from('AttendanceV2')  // was Attendance
-    .select('student_id')
-    .eq('semester', currentSemester)
-    .eq('status', 'ALPHA');
-
-    if (alphaErr) throw alphaErr;
+    // Paginated: a full semester of ALPHA rows can exceed 1000 easily.
+    const alphaRows = await fetchAllRows((from, to) =>
+      sb
+        .from('AttendanceV2')
+        .select('student_id')
+        .eq('semester', currentSemester)
+        .eq('status', 'ALPHA')
+        .range(from, to)
+    );
 
     const studentAlphaCounts = {};
     (alphaRows || []).forEach(r => {
@@ -396,14 +441,13 @@ async function loadOverseerEkstra() {
   if (container) container.innerHTML = '<div class="overseer-empty">Memuat...</div>';
 
   try {
-    const { data, error } = await sb
-      .from('Database')
-      .select('ekstra');
-
-    if (error) throw error;
+    // Paginated: total student count can exceed 1000 for larger schools.
+    const rows = await fetchAllRows((from, to) =>
+      sb.from('Database').select('ekstra').range(from, to)
+    );
 
     const counts = {};
-    (data || []).forEach(s => {
+    rows.forEach(s => {
       const e = (s.ekstra || 'Tidak diketahui').trim();
       if (!e || e === '0') {
         counts['(Tanpa Ekskul)'] = (counts['(Tanpa Ekskul)'] || 0) + 1;
@@ -442,20 +486,32 @@ function renderOverseerEkstra(list) {
 // ===== WA REPORT FROM 1ST CARD =====
 let waReportSelectedDate = null;
 let waReportData = [];
+let waReportPendingAlpha = []; // student_ids that need an ALPHA row written to AttendanceV2 on confirm
 
 async function openWaReportModal() {
   if (overseerDates.length === 0) await loadOverseerDates();
 
   waReportSelectedDate = null;
   waReportData = [];
+  waReportPendingAlpha = [];
 
   document.getElementById('waReportDateStep').style.display = 'block';
   document.getElementById('waReportWarning').style.display = 'none';
   document.getElementById('waReportPreview').style.display = 'none';
   document.getElementById('waReportFooter').style.display = 'none';
 
+  // The WA report's whole purpose is to catch students with no attendance
+  // input yet — so unlike the stats picker, it needs "today" selectable
+  // even when today has zero rows so far. We build this list separately
+  // instead of reusing overseerDates as-is, so we don't reintroduce an
+  // empty "fake" date into the stats picker.
+  const today = getJakartaDateString();
+  const reportDates = [...overseerDates];
+  if (!reportDates.includes(today)) reportDates.unshift(today);
+  reportDates.sort((a, b) => parseIndonesianDate(b) - parseIndonesianDate(a));
+
   const list = document.getElementById('waReportDateList');
-  list.innerHTML = overseerDates.map(d => `
+  list.innerHTML = reportDates.map(d => `
     <div class="overseer-date-item" onclick="selectWaReportDate('${d}')">
       <span>${d}</span>
     </div>
@@ -473,22 +529,34 @@ async function selectWaReportDate(date) {
   showLoading(true);
 
   try {
-    // 1. All students
-    const { data: allStudents, error: studErr } = await sb
-      .from('Database')
-      .select('id, nama, kelas');
-    if (studErr) throw studErr;
+    // 1. All students (paginated — a large school can exceed 1000 rows)
+    const allStudents = await fetchAllRows((from, to) =>
+      sb.from('Database').select('id, nama, kelas').range(from, to)
+    );
 
-        // 2. AttendanceV2 for selected date
-    const { data: attendance, error: attErr } = await sb
-      .from('AttendanceV2')          // ← KEEP the V2! This is the table name.
-      .select('student_id, status')
-      .eq('date', date)
-      .eq('semester', currentSemester);
-    if (attErr) throw attErr;
+    // 2. AttendanceV2 for selected date (paginated for the same reason)
+    const attendance = await fetchAllRows((from, to) =>
+      sb
+        .from('AttendanceV2')
+        .select('student_id, status')
+        .eq('date', date)
+        .eq('semester', currentSemester)
+        .range(from, to)
+    );
+
+    // BUG FIX: if literally nobody has an attendance row for this date,
+    // that means attendance hasn't been input yet (scanner down, not run,
+    // etc.) — NOT that every student is absent. Bail out instead of
+    // silently reporting the whole school as ALPHA.
+    if (!attendance || attendance.length === 0) {
+      showLoading(false);
+      showStatus(`Belum ada absensi yang diinput untuk tanggal ${date}`, "error");
+      waReportSelectedDate = null;
+      return;
+    }
 
     const attMap = {};
-    (attendance || []).forEach(a => {   // ← lowercase `attendance` (the variable)
+    attendance.forEach(a => {
       attMap[a.student_id] = (a.status || '').trim().toUpperCase();
     });
 
@@ -499,17 +567,26 @@ async function selectWaReportDate(date) {
     const processed = (allStudents || []).map(s => {
       const raw = attMap[s.id] || '';
       let status = raw;
+      let needsAlphaWrite = false;
 
       if (!status) {
         status = 'ALPHA';
+        needsAlphaWrite = true;
         emptyCount++;
       } else if (status === 'TELAT') {
         status = 'ALPHA';
+        needsAlphaWrite = true;
         telatCount++;
       }
 
-      return { ...s, reportStatus: status };
+      return { ...s, reportStatus: status, needsAlphaWrite };
     });
+
+    // Remember who actually needs a new/updated ALPHA row written to
+    // AttendanceV2 — the warning tells the admin "this will be considered
+    // ALPHA," so confirming it (proceedWaReport) needs to actually persist
+    // that, not just use it for the WhatsApp text.
+    waReportPendingAlpha = processed.filter(s => s.needsAlphaWrite).map(s => s.id);
 
     // 4. Keep only ALPHA, TERLAMBAT, PAGI
     waReportData = processed.filter(s =>
@@ -559,8 +636,37 @@ async function selectWaReportDate(date) {
   showLoading(false);
 }
 
-function proceedWaReport() {
+async function proceedWaReport() {
   document.getElementById('waReportWarning').style.display = 'none';
+
+  // BUG FIX: the warning tells the admin these students "akan dianggap
+  // ALPHA" — but nothing was ever writing that to AttendanceV2, so it only
+  // ever affected the WhatsApp message text and never showed up in the
+  // table or in the Overseer alpha-count stats. Confirming here is the
+  // admin's explicit go-ahead, so persist it now.
+  if (waReportPendingAlpha.length > 0) {
+    showLoading(true);
+    try {
+      const rowsToUpsert = waReportPendingAlpha.map(studentId => ({
+        student_id: studentId,
+        date: waReportSelectedDate,
+        status: 'ALPHA',
+        semester: currentSemester,
+        operator: currentOperator ? `${currentOperator} (Laporan WA)` : 'Laporan WA'
+      }));
+
+      const { error } = await sb
+        .from('AttendanceV2')
+        .upsert(rowsToUpsert, { onConflict: 'student_id,date,semester' });
+
+      if (error) throw error;
+    } catch (err) {
+      console.error(err);
+      showStatus('Gagal menyimpan status ALPHA: ' + err.message, 'error');
+    }
+    showLoading(false);
+  }
+
   showWaReportPreview();
 }
 
