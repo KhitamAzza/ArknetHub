@@ -1,6 +1,6 @@
 // ArkNet Hub — Service Worker
 // Bump CACHE_VERSION on every deploy so old shells get replaced.
-const CACHE_VERSION = 'arknet-hub-v4';
+const CACHE_VERSION = 'arknet-hub-v5';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 
 // App shell: everything needed for the UI to boot and render offline.
