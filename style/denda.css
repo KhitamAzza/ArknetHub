@@ -51,48 +51,89 @@
 
 .denda-fab:active { transform: scale(0.92); }
 
-/* ===== FAB SUMMARY MODAL ===== */
-.denda-fab-row {
-  padding: 14px 20px;
-  border-bottom: 1px solid var(--border);
+/* ===== FAB SUMMARY MODAL — 3-level drill-down ===== */
+/* Levels 1 (submitters) and 2 (days) reuse .tatib-debt-row for the
+   clickable name+total cards. Level 3 (payments) uses the styles below. */
+#dendaFabList {
+  max-height: 65vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 8px 16px 24px;
 }
 
-.denda-fab-row:last-child { border-bottom: none; }
-
-.denda-fab-name {
-  font-size: 14px;
-  font-weight: 700;
-  margin-bottom: 8px;
-}
-
-.denda-fab-figures {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 8px;
-}
-
-.denda-fab-figure {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.denda-fab-label {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-}
-
-.denda-fab-value {
+.denda-fab-back {
+  padding: 12px 4px 4px;
   font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.denda-fab-back:active { opacity: 0.6; }
+
+.denda-fab-header-title {
+  padding: 0 4px 12px;
+  font-size: 15px;
   font-weight: 800;
   color: var(--text);
 }
 
-.denda-fab-value.green { color: var(--green); }
-.denda-fab-value.red { color: var(--red); }
+.denda-fab-done-banner {
+  margin: 0 4px 10px;
+  padding: 8px 12px;
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 10px;
+}
+
+.denda-fab-payment {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 4px;
+  border-bottom: 1px dashed var(--border);
+}
+
+.denda-fab-payment:last-child { border-bottom: none; }
+
+.denda-fab-payment-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.denda-fab-payment-amount {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text);
+  flex-shrink: 0;
+}
+
+.denda-fab-payment-status {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 20px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.denda-fab-payment-status.confirmed {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--green);
+}
+
+.denda-fab-payment-status.pending {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--red);
+}
 /* ===== DENDA FULL-SCREEN SCREENS ===== */
 #penarikanDendaScreen,
 #adminDendaPaymentScreen,

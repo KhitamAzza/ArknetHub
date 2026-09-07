@@ -368,9 +368,11 @@ async function submitTatibPayment() {
     // refreshTatibListSilently();
   } catch (err) {
     showStatus("Error: " + err.message, "error");
-    btn.disabled = false;
   }
 
+  // Always re-enable — previously this only happened in the catch block,
+  // so a *successful* submit left the button disabled until page refresh.
+  btn.disabled = false;
   showLoading(false);
 }
 

@@ -10,6 +10,13 @@ function formatRupiah(n) {
   return 'Rp ' + (n || 0).toLocaleString('id-ID');
 }
 
+// Plain YYYY-MM-DD in Asia/Jakarta — used for the `received_at` date column,
+// which only needs to record *which day* a payment was received/confirmed,
+// not an exact timestamp.
+function todayJakarta() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
+}
+
 /* ===== NAVIGATION ===== */
 function showPenarikanDenda() {
   hideAllScreens();
@@ -265,6 +272,7 @@ async function submitAdminDendaPayment() {
       amount: amount,
       submitter: currentOperator,
       note: `Diterima oleh ${currentOperator}`,
+      received_at: todayJakarta(),
       semester: currentSemester
     });
     if (error) throw error;
@@ -436,7 +444,7 @@ async function submitDendaDiterima() {
   try {
     const { data: updated, error } = await sb
       .from('bayardenda')
-      .update({ note: `Diterima oleh ${currentOperator}` })
+      .update({ note: `Diterima oleh ${currentOperator}`, received_at: todayJakarta() })
       .in('id', allRowIds)
       .select('id');
     if (error) throw error;
@@ -460,34 +468,65 @@ async function submitDendaDiterima() {
 }
 
 /* ===================================================
-   FAB — per-tatib collected / handed-over summary
-   Only counts submitters who are known TATIB accounts
-   (per the OPERATORS map in main.js) — admin's own
-   self-confirmed payments are excluded, since those never
-   go through a hand-over step.
+   FAB — per-submitter collected summary, drill-down:
+     Level 1 "submitters": name + grand total only
+     Level 2 "days":       that submitter's days + day total
+     Level 3 "payments":   that day's students + amount +
+                            admin-received status (only
+                            surfaced at this level)
+   Includes every submitter — tatib accounts and admin's own
+   direct entries alike. Admin-recorded payments are always
+   self-confirmed immediately, so their days will naturally
+   always show as fully "Diterima admin".
    =================================================== */
+let dendaFabData = {};              // submitter -> { total, days: { dayKey: { label, total, payments } } }
+let dendaFabView = 'submitters';    // 'submitters' | 'days' | 'payments'
+let dendaFabSelectedSubmitter = null;
+let dendaFabSelectedDay = null;
+
 async function openDendaFabSummary() {
   showLoading(true);
   try {
-    const tatibNames = new Set(
-      Object.values(OPERATORS).filter(op => op.isTatib).map(op => op.name)
-    );
-
     const { data, error } = await sb
       .from('bayardenda')
-      .select('submitter, amount, note')
-      .eq('semester', currentSemester);
+      .select('submitter, amount, note, created_at, Database(nama)')
+      .eq('semester', currentSemester)
+      .order('created_at', { ascending: false });
     if (error) throw error;
 
     const summary = {};
     (data || []).forEach(row => {
-      if (!row.submitter || !tatibNames.has(row.submitter)) return;
-      if (!summary[row.submitter]) summary[row.submitter] = { total: 0, handed: 0 };
-      summary[row.submitter].total += row.amount || 0;
-      if (row.note) summary[row.submitter].handed += row.amount || 0;
+      if (!row.submitter) return;
+      if (!summary[row.submitter]) summary[row.submitter] = { total: 0, days: {} };
+      const s = summary[row.submitter];
+      s.total += row.amount || 0;
+
+      const dayKey = row.created_at
+        ? new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date(row.created_at))
+        : 'unknown';
+      if (!s.days[dayKey]) {
+        s.days[dayKey] = {
+          label: row.created_at
+            ? new Intl.DateTimeFormat('id-ID', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Jakarta' }).format(new Date(row.created_at))
+            : 'Tanggal tidak diketahui',
+          total: 0,
+          payments: []
+        };
+      }
+      s.days[dayKey].total += row.amount || 0;
+      s.days[dayKey].payments.push({
+        nama: row.Database?.nama || '(tidak diketahui)',
+        amount: row.amount || 0,
+        note: row.note || null
+      });
     });
 
-    renderDendaFabSummary(summary);
+    dendaFabData = summary;
+    dendaFabView = 'submitters';
+    dendaFabSelectedSubmitter = null;
+    dendaFabSelectedDay = null;
+
+    renderDendaFabView();
     document.getElementById('dendaFabModal')?.classList.add('visible');
   } catch (err) {
     showStatus('Gagal memuat ringkasan: ' + err.message, 'error');
@@ -495,41 +534,125 @@ async function openDendaFabSummary() {
   showLoading(false);
 }
 
-function renderDendaFabSummary(summary) {
+function renderDendaFabView() {
   const container = document.getElementById('dendaFabList');
   if (!container) return;
 
-  const names = Object.keys(summary);
+  if (dendaFabView === 'days') return renderDendaFabDaysView(container);
+  if (dendaFabView === 'payments') return renderDendaFabPaymentsView(container);
+  return renderDendaFabSubmittersView(container);
+}
+
+// Level 1: names + grand total only — no diserahkan/belum breakdown here.
+function renderDendaFabSubmittersView(container) {
+  const names = Object.keys(dendaFabData);
   if (names.length === 0) {
     container.innerHTML = `<div class="tatib-history-empty" style="padding:24px;">Belum ada setoran tatib</div>`;
     return;
   }
+  container.innerHTML = names.map(name => `
+    <div class="tatib-debt-row" onclick="openDendaFabSubmitter('${encodeURIComponent(name)}')">
+      <div class="tatib-debt-main">
+        <div class="tatib-debt-name">${escapeHtml(name)}</div>
+      </div>
+      <div class="tatib-debt-badge">
+        <div class="tatib-debt-amount" style="color:var(--text)">${formatRupiah(dendaFabData[name].total)}</div>
+      </div>
+    </div>
+  `).join('');
+}
 
-  container.innerHTML = names.map(name => {
-    const s = summary[name];
-    const pending = s.total - s.handed;
+function openDendaFabSubmitter(encodedName) {
+  dendaFabSelectedSubmitter = decodeURIComponent(encodedName);
+  dendaFabView = 'days';
+  renderDendaFabView();
+}
+
+// Level 2: that tatib's days + day total.
+function renderDendaFabDaysView(container) {
+  const s = dendaFabData[dendaFabSelectedSubmitter];
+  if (!s) { dendaFabView = 'submitters'; return renderDendaFabView(); }
+
+  const dayKeys = Object.keys(s.days).sort((a, b) => b.localeCompare(a));
+
+  const rows = dayKeys.map(dayKey => {
+    const d = s.days[dayKey];
+    const allHanded = d.payments.length > 0 && d.payments.every(p => p.note);
     return `
-      <div class="denda-fab-row">
-        <div class="denda-fab-name">${escapeHtml(name)}</div>
-        <div class="denda-fab-figures">
-          <div class="denda-fab-figure">
-            <span class="denda-fab-label">Total</span>
-            <span class="denda-fab-value">${formatRupiah(s.total)}</span>
-          </div>
-          <div class="denda-fab-figure">
-            <span class="denda-fab-label">Diserahkan</span>
-            <span class="denda-fab-value green">${formatRupiah(s.handed)}</span>
-          </div>
-          <div class="denda-fab-figure">
-            <span class="denda-fab-label">Belum</span>
-            <span class="denda-fab-value ${pending > 0 ? 'red' : ''}">${formatRupiah(pending)}</span>
+      <div class="tatib-debt-row" onclick="openDendaFabDay('${dayKey}')">
+        <div class="tatib-debt-main">
+          <div class="tatib-debt-name">${escapeHtml(d.label)}</div>
+        </div>
+        <div class="tatib-debt-badge">
+          <div class="tatib-debt-amount" style="color:var(--text)">${formatRupiah(d.total)}</div>
+          <div class="denda-fab-payment-status ${allHanded ? 'confirmed' : 'pending'}" style="margin-top:4px; display:inline-block;">
+            ${allHanded ? 'Diterima admin' : 'Belum diserahkan'}
           </div>
         </div>
       </div>
     `;
-  }).join('');
+  }).join('') || `<div class="tatib-history-empty" style="padding:24px;">Belum ada setoran</div>`;
+
+  container.innerHTML = `
+    <div class="denda-fab-back" onclick="backDendaFabToSubmitters()">‹ Semua Tatib</div>
+    <div class="denda-fab-header-title">${escapeHtml(dendaFabSelectedSubmitter)}</div>
+    ${rows}
+  `;
+}
+
+function backDendaFabToSubmitters() {
+  dendaFabView = 'submitters';
+  dendaFabSelectedSubmitter = null;
+  renderDendaFabView();
+}
+
+function openDendaFabDay(dayKey) {
+  dendaFabSelectedDay = dayKey;
+  dendaFabView = 'payments';
+  renderDendaFabView();
+}
+
+// Level 3: that day's students + amount + admin-received status.
+// This is the only level where the confirmed/pending badge shows.
+function renderDendaFabPaymentsView(container) {
+  const s = dendaFabData[dendaFabSelectedSubmitter];
+  const day = s?.days?.[dendaFabSelectedDay];
+  if (!day) { dendaFabView = 'days'; return renderDendaFabView(); }
+
+  const isToday = dendaFabSelectedDay === todayJakarta();
+  const allHanded = day.payments.length > 0 && day.payments.every(p => p.note);
+  const doneBanner = (isToday && allHanded)
+    ? `<div class="denda-fab-done-banner">✓ Setoran hari ini sudah diterima admin</div>`
+    : '';
+
+  const rows = day.payments.map(p => `
+    <div class="denda-fab-payment">
+      <span class="denda-fab-payment-name">${escapeHtml(p.nama)}</span>
+      <span class="denda-fab-payment-amount">${formatRupiah(p.amount)}</span>
+      <span class="denda-fab-payment-status ${p.note ? 'confirmed' : 'pending'}">
+        ${p.note ? 'Diterima admin' : 'Belum diserahkan'}
+      </span>
+    </div>
+  `).join('');
+
+  container.innerHTML = `
+    <div class="denda-fab-back" onclick="backDendaFabToDays()">‹ ${escapeHtml(dendaFabSelectedSubmitter)}</div>
+    <div class="denda-fab-header-title">${escapeHtml(day.label)} • ${formatRupiah(day.total)}</div>
+    ${doneBanner}
+    ${rows}
+  `;
+}
+
+function backDendaFabToDays() {
+  dendaFabView = 'days';
+  dendaFabSelectedDay = null;
+  renderDendaFabView();
 }
 
 function closeDendaFabModal() {
   document.getElementById('dendaFabModal')?.classList.remove('visible');
+  // Reset to top level so it doesn't reopen mid-drill-down next time.
+  dendaFabView = 'submitters';
+  dendaFabSelectedSubmitter = null;
+  dendaFabSelectedDay = null;
 }
