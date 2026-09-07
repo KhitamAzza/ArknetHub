@@ -33,7 +33,7 @@ const OPERATORS = {
   "ekstabog": { name: "Enggarsari", ekstra: "Tata Boga" },
   "eksarias": { name: "Silvina Maghfira", ekstra: "Tata Rias" },
   "ekstapmr": { name: "Nur Khozinatul", ekstra: "PMR" },
-  "ekswondo": { name: "jalupaka", ekstra: "Taekwondo" },
+  "ekswondo": { name: "Romadhoni", ekstra: "Taekwondo" },
   "eksdance": { name: "Ocha", ekstra: "Dance" },
   "ekscatur": { name: "Vanny", ekstra: "Catur" },
   "ekscinalam": { name: "Badrian", ekstra: "Pecinta Alam" },
