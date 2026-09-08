@@ -1110,6 +1110,10 @@
       <div class="dash-icon">🚨</div>
       <div class="dash-label">Siswa Bermasalah</div>
     </div>
+    <div class="dash-btn" onclick="showTatibMinus()">
+      <div class="dash-icon">📉</div>
+      <div class="dash-label">Nilai Minus</div>
+    </div>
     <!-- NEW BUTTON -->
     <div class="dash-btn" onclick="showProofViewer()">
       <div class="dash-icon">🖼️</div>
@@ -1122,6 +1126,7 @@
     </div>
   </div>
 </div>
+
 <!-- TATIB PAYMENT SCREEN (Full Page List) -->
 <div id="tatibPaymentScreen" style="display:none;">
   <div class="app-header">
@@ -1194,42 +1199,44 @@
     <button class="icon-btn" onclick="backToTatib()">◀</button>
     <div class="operator-info" style="flex:1; margin-left:12px;">
       <div class="operator-name">Siswa Bermasalah</div>
-      <div class="operator-ekstra">Daftar siswa yang perlu ditindak</div>
-    </div>
-  </div>
-
-  <div class="stats-bar">
-    <div class="stat-card">
-      <div class="stat-label">TOTAL</div>
-      <div class="stat-value" id="tatibBmStatTotal">0</div>
-    </div>
-    <div class="stat-card stat-green">
-      <div class="stat-label">SUDAH</div>
-      <div class="stat-value" id="tatibBmStatDone">0</div>
-    </div>
-    <div class="stat-card stat-red">
-      <div class="stat-label">BELUM</div>
-      <div class="stat-value" id="tatibBmStatPending">0</div>
+      <div class="operator-ekstra">Kelas dengan denda tertunggak, terbesar dulu</div>
     </div>
   </div>
 
   <div class="tatib-search-wrap">
-    <input type="text" id="tatibBmSearchInput" class="tatib-search-input" placeholder="Cari nama atau kelas..." oninput="onTatibBmSearch()" autocomplete="off">
-  </div>
-    <div class="tatib-bm-filters">
-    <button class="tatib-bm-filter active" onclick="setTatibBmFilter('all')">Semua</button>
-    <button class="tatib-bm-filter" onclick="setTatibBmFilter('tanpa')">Tanpa Ekstra</button>
-    <button class="tatib-bm-filter" onclick="setTatibBmFilter('alpha3')">Alpha ≥3</button>
+    <input type="text" id="tatibBmSearchInput" class="tatib-search-input" placeholder="Cari kelas..." oninput="onTatibBmSearch()" autocomplete="off">
   </div>
 
   <div class="tatib-debt-list-container" id="tatibBmListContainer"></div>
-  
+
   <div class="empty-state" id="tatibBmEmpty" style="display:none;">
     <div class="empty-state-icon">✅</div>
-    <div class="empty-state-text">Tidak ada siswa bermasalah</div>
+    <div class="empty-state-text">Tidak ada kelas dengan denda tertunggak</div>
   </div>
-</div>
 
+</div>
+<!-- TATIB NILAI MINUS SCREEN -->
+<div id="tatibMinusScreen" style="display:none;">
+  <div class="app-header">
+    <button class="icon-btn" onclick="backToTatib()">◀</button>
+    <div class="operator-info" style="flex:1; margin-left:12px;">
+      <div class="operator-name">Nilai Minus</div>
+      <div class="operator-ekstra">Kelas dengan poin minus terparah, terbesar dulu</div>
+    </div>
+  </div>
+
+  <div class="tatib-search-wrap">
+    <input type="text" id="tatibMinusSearchInput" class="tatib-search-input" placeholder="Cari kelas..." oninput="onTatibMinusSearch()" autocomplete="off">
+  </div>
+
+  <div class="tatib-debt-list-container" id="tatibMinusListContainer"></div>
+
+  <div class="empty-state" id="tatibMinusEmpty" style="display:none;">
+    <div class="empty-state-icon">✅</div>
+    <div class="empty-state-text">Tidak ada kelas dengan nilai minus</div>
+  </div>
+
+</div>
 <!-- ===== LATE RECORD SCREEN ===== -->
 <div id="lateRecordScreen" style="display:none;">
   <div class="app-header">
