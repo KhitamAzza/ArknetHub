@@ -8,7 +8,6 @@ let tatibIsBackgroundRefreshing = false;
 
 let tatibHeatmapData = null;
 let tatibHeatmapMode = "kelas";
-let tatibBmFilterMode = 'all';
 
 function escapeHtml(text) {
   const div = document.createElement("div");
@@ -376,9 +375,27 @@ async function submitTatibPayment() {
   showLoading(false);
 }
 
-/* ===== BERMASALAH CHECKLIST ===== */
-let tatibBmData = [];
-let tatibBmFiltered = [];
+/* ===================================================
+   BERMASALAH — kelas x total debt (remodeled)
+   Alpha-count-per-student was noisy and redundant with the
+   denda module, so this now groups students-with-debt by
+   kelas and surfaces total outstanding denda per class —
+   the number that actually matters for follow-up priority.
+
+   Reuses fetchTatibDebtData()'s sisa > 0 filter, so students
+   who've already paid off their fine never appear here.
+
+   Level 1 "classes": kelas + total debt, sorted biggest first
+   Level 2 "detail":   that class's students + violation
+                        counts + individual debt, plus an
+                        "Ingatkan Wakel" WhatsApp button
+   Plus a bottom "Kirim Semua Laporan" button on level 1 that
+   compiles every class into one forwardable report.
+   =================================================== */
+let tatibBmClassData = [];      // [{ kelas, totalDebt, students: [{nama, alphaCount, terlambatCount, sisa}] }]
+let tatibBmView = 'classes';    // 'classes' | 'detail'
+let tatibBmSelectedKelas = null;
+let tatibBmWakelMap = {};       // kelas -> { kelas, nama, whatsapp }
 
 function showTatibBermasalah() {
   hideAllScreens();
@@ -396,15 +413,22 @@ async function initTatibBermasalah() {
 
   if (container) container.innerHTML = "";
   if (empty) empty.style.display = "none";
-  if (searchInput) searchInput.value = "";
+  if (searchInput) {
+    searchInput.value = "";
+    searchInput.placeholder = "Cari kelas...";
+  }
+
+  tatibBmView = 'classes';
+  tatibBmSelectedKelas = null;
 
   showLoading(true);
   try {
     await fetchTatibBermasalahData();
-    updateTatibBmStats();
-    applyTatibBmFilters();
-    if (tatibBmData.length === 0) {
-      if (empty) empty.style.display = "block";
+    renderTatibBmView();
+    if (tatibBmClassData.length === 0 && empty) {
+      empty.style.display = "block";
+      const txt = empty.querySelector(".empty-state-text");
+      if (txt) txt.textContent = "Tidak ada kelas dengan denda tertunggak";
     }
   } catch (err) {
     console.error(err);
@@ -418,202 +442,466 @@ async function initTatibBermasalah() {
   showLoading(false);
 }
 
-function setTatibBmFilter(mode) {
-  tatibBmFilterMode = mode;
-  document.querySelectorAll('.tatib-bm-filter').forEach(btn => {
-    const isMatch = 
-      (mode === 'all' && btn.textContent.includes('Semua')) ||
-      (mode === 'tanpa' && btn.textContent.includes('Tanpa')) ||
-      (mode === 'alpha3' && btn.textContent.includes('Alpha'));
-    btn.classList.toggle('active', isMatch);
+async function fetchTatibBermasalahData() {
+  // Same debt formula as the payment screens (violations x Config's
+  // denda_alpha/denda_terlambat, minus what's already been paid) — sisa > 0
+  // only, so fully-paid students are excluded automatically.
+  await fetchTatibDebtData(); // populates tatibDebtors
+
+  const { data: wakelRows, error: wErr } = await sb.from('Wakel').select('kelas, nama, whatsapp');
+  if (wErr) console.warn("Wakel load:", wErr.message);
+  tatibBmWakelMap = {};
+  (wakelRows || []).forEach(w => { tatibBmWakelMap[w.kelas] = w; });
+
+  const byClass = {};
+  tatibDebtors.forEach(s => {
+    const kelas = s.kelas || 'Tanpa Kelas';
+    if (!byClass[kelas]) byClass[kelas] = { kelas, totalDebt: 0, students: [] };
+    byClass[kelas].totalDebt += s.sisa;
+    byClass[kelas].students.push({
+      nama: s.nama,
+      alphaCount: s.alphaCount,
+      terlambatCount: s.terlambatCount,
+      sisa: s.sisa
+    });
   });
-  applyTatibBmFilters();
+
+  tatibBmClassData = Object.values(byClass).sort((a, b) => b.totalDebt - a.totalDebt);
+  tatibBmClassData.forEach(c => c.students.sort((a, b) => b.sisa - a.sisa));
 }
 
-function applyTatibBmFilters() {
-  const input = document.getElementById("tatibBmSearchInput");
-  const q = (input?.value || "").trim().toLowerCase();
-
-  tatibBmFiltered = tatibBmData.filter(s => {
-    if (tatibBmFilterMode === 'tanpa' && !s.hasNoEkstra) return false;
-    if (tatibBmFilterMode === 'alpha3' && s.alphaCount < 3) return false;
-
-    if (!q) return true;
-    return (s.nama && s.nama.toLowerCase().includes(q)) ||
-           (s.kelas && s.kelas.toLowerCase().includes(q));
-  });
-
-  renderTatibBermasalahList(tatibBmFiltered);
-
-  const empty = document.getElementById("tatibBmEmpty");
-  if (empty) empty.style.display = tatibBmFiltered.length === 0 ? "block" : "none";
+function renderTatibBmView() {
+  if (tatibBmView === 'detail') return renderTatibBmDetailView();
+  return renderTatibBmClassesView();
 }
 
 function onTatibBmSearch() {
-  applyTatibBmFilters();
+  renderTatibBmView();
 }
 
-async function fetchTatibBermasalahData() {
-  const { data: students, error: sErr } = await sb
-    .from('Database')
-    .select('id, nama, kelas, ekstra, photo_url');
-  if (sErr) throw sErr;
-
-  const { data: alphaRows, error: aErr } = await sb
-  .from('AttendanceV2')
-  .select('student_id')
-  .eq('semester', currentSemester)
-  .eq('status', 'ALPHA');
-  if (aErr) throw aErr;
-
-  const alphaCounts = {};
-  (alphaRows || []).forEach(r => {
-    alphaCounts[r.student_id] = (alphaCounts[r.student_id] || 0) + 1;
-  });
-
-  const { data: checks, error: cErr } = await sb
-    .from('TatibCheck')
-    .select('student_id, checked_at')
-    .eq('semester', currentSemester);
-  if (cErr) console.warn("TatibCheck load:", cErr.message);
-
-  const checkedMap = {};
-  (checks || []).forEach(c => { checkedMap[c.student_id] = c.checked_at; });
-
-  const list = [];
-  (students || []).forEach(s => {
-    const ekstra = (s.ekstra || '').trim();
-    const hasNoEkstra = !ekstra || ekstra === '0';
-    const alphaCount = alphaCounts[s.id] || 0;
-
-    if (hasNoEkstra || alphaCount > 0) {
-      list.push({
-        id: s.id,
-        nama: s.nama,
-        kelas: s.kelas,
-        photo_url: s.photo_url,
-        hasNoEkstra,
-        alphaCount,
-        checked: !!checkedMap[s.id]
-      });
-    }
-  });
-
-  list.sort((a, b) => {
-    if (a.checked !== b.checked) return a.checked ? 1 : -1;
-    return a.nama.localeCompare(b.nama);
-  });
-
-  tatibBmData = list;
-  tatibBmFiltered = [...list];
-}
-
-function updateTatibBmStats() {
-  const total = tatibBmData.length;
-  const done = tatibBmData.filter(s => s.checked).length;
-  const pending = total - done;
-
-  const elTotal = document.getElementById("tatibBmStatTotal");
-  const elDone = document.getElementById("tatibBmStatDone");
-  const elPending = document.getElementById("tatibBmStatPending");
-
-  if (elTotal) elTotal.textContent = total;
-  if (elDone) elDone.textContent = done;
-  if (elPending) elPending.textContent = pending;
-}
-
-function renderTatibBermasalahList(list) {
+// Level 1: kelas + total debt, biggest first.
+function renderTatibBmClassesView() {
   const container = document.getElementById("tatibBmListContainer");
   if (!container) return;
-  if (!list.length) { container.innerHTML = ""; return; }
 
-  container.innerHTML = list.map(s => {
-    const hasPhoto = !!s.photo_url;
-    const safeId = String(s.id).replace(/'/g, "\\'");
-    return `
-      <div class="tatib-bm-row ${s.checked ? 'checked' : ''}" id="tatibBmRow-${s.id}">
-        ${hasPhoto 
-          ? `<img class="tatib-bm-photo" src="${escapeHtml(s.photo_url)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
-          : `<div class="tatib-bm-placeholder">👤</div>`
-        }
-        <div class="tatib-bm-info">
-          <div class="tatib-bm-name">${escapeHtml(s.nama)}</div>
-          <div class="tatib-bm-class">${escapeHtml(s.kelas)}</div>
-          <div class="tatib-bm-badges">
-            ${s.hasNoEkstra ? `<span class="tatib-bm-badge tanpa">Tanpa Ekstra</span>` : ''}
-            ${s.alphaCount > 0 ? `<span class="tatib-bm-badge alpha">Alpha ${s.alphaCount}x</span>` : ''}
-          </div>
-        </div>
-        <button class="tatib-bm-toggle ${s.checked ? 'checked' : ''}" onclick="toggleTatibCheck('${safeId}')">
-          <div class="tatib-bm-toggle-thumb"></div>
-        </button>
+  const q = (document.getElementById("tatibBmSearchInput")?.value || '').trim().toLowerCase();
+  const list = !q ? tatibBmClassData : tatibBmClassData.filter(c => c.kelas.toLowerCase().includes(q));
+
+  const empty = document.getElementById("tatibBmEmpty");
+  if (empty) empty.style.display = (tatibBmClassData.length > 0 && list.length === 0) ? "block" : "none";
+
+  if (tatibBmClassData.length === 0) { container.innerHTML = ""; return; }
+
+  const rows = list.map(c => `
+    <div class="tatib-debt-row" onclick="openTatibBmClass('${encodeURIComponent(c.kelas)}')">
+      <div class="tatib-debt-main">
+        <div class="tatib-debt-name">${escapeHtml(c.kelas)}</div>
+        <div class="tatib-debt-class">${c.students.length} siswa menunggak</div>
       </div>
-    `;
-  }).join('');
+      <div class="tatib-debt-badge">
+        <div class="tatib-debt-amount">${formatRupiah(c.totalDebt)}</div>
+        <div class="tatib-debt-sub">total denda</div>
+      </div>
+    </div>
+  `).join('');
+
+  container.innerHTML = rows + `
+    <button class="tatib-bm-action-btn green" onclick="sendTatibBmAllReport()">
+      📤 Kirim Semua Laporan
+    </button>
+  `;
 }
 
-function onTatibBmSearch() {
-  const input = document.getElementById("tatibBmSearchInput");
-  const q = (input?.value || "").trim().toLowerCase();
-  if (!q) {
-    tatibBmFiltered = [...tatibBmData];
-  } else {
-    tatibBmFiltered = tatibBmData.filter(s =>
-      (s.nama && s.nama.toLowerCase().includes(q)) ||
-      (s.kelas && s.kelas.toLowerCase().includes(q))
-    );
-  }
-  renderTatibBermasalahList(tatibBmFiltered);
+function openTatibBmClass(encodedKelas) {
+  tatibBmSelectedKelas = decodeURIComponent(encodedKelas);
+  tatibBmView = 'detail';
+  renderTatibBmView();
 }
 
-async function toggleTatibCheck(studentId) {
-  const student = tatibBmData.find(s => String(s.id) === String(studentId));
-  if (!student) return;
+function backTatibBmToClasses() {
+  tatibBmView = 'classes';
+  tatibBmSelectedKelas = null;
+  renderTatibBmView();
+}
 
-  const newChecked = !student.checked;
-  student.checked = newChecked;
+// Level 2: that class's students + violation breakdown + individual debt.
+function renderTatibBmDetailView() {
+  const container = document.getElementById("tatibBmListContainer");
+  if (!container) return;
+  const empty = document.getElementById("tatibBmEmpty");
+  if (empty) empty.style.display = "none";
 
-  // Optimistic UI
-  const row = document.getElementById(`tatibBmRow-${studentId}`);
-  if (row) {
-    row.classList.toggle('checked', newChecked);
-    const toggle = row.querySelector('.tatib-bm-toggle');
-    if (toggle) toggle.classList.toggle('checked', newChecked);
+  const c = tatibBmClassData.find(x => x.kelas === tatibBmSelectedKelas);
+  if (!c) { tatibBmView = 'classes'; return renderTatibBmView(); }
+
+  const wakel = tatibBmWakelMap[c.kelas];
+
+  const rows = c.students.map(s => `
+    <div class="denda-fab-payment">
+      <span class="denda-fab-payment-name">${escapeHtml(s.nama)} — ${escapeHtml(tatibBmViolationLabel(s))}</span>
+      <span class="denda-fab-payment-amount">${formatRupiah(s.sisa)}</span>
+    </div>
+  `).join('');
+
+  const wakelLine = wakel
+    ? `<div class="tatib-detail-class" style="padding:0 4px 12px;">Wakel: ${escapeHtml(wakel.nama || '-')}</div>`
+    : `<div class="tatib-pay-hint error" style="padding:0 4px 12px;">Nomor wali kelas belum terdaftar di tabel Wakel</div>`;
+
+  container.innerHTML = `
+    <div class="denda-fab-back" onclick="backTatibBmToClasses()">‹ Semua Kelas</div>
+    <div class="denda-fab-header-title">${escapeHtml(c.kelas)} • ${formatRupiah(c.totalDebt)}</div>
+    ${wakelLine}
+    ${rows}
+    <button class="tatib-bm-action-btn" onclick="sendTatibBmWakelReminder()" ${wakel && wakel.whatsapp ? '' : 'disabled'}>
+      💬 Ingatkan Wakel
+    </button>
+  `;
+}
+
+function tatibBmViolationLabel(s) {
+  const parts = [];
+  if (s.alphaCount > 0) parts.push(`Alpha ${s.alphaCount}x`);
+  if (s.terlambatCount > 0) parts.push(`Terlambat ${s.terlambatCount}x`);
+  return parts.join(', ') || '-';
+}
+
+function formatRupiahPlain(n) {
+  // "Rp.20.000" to match the requested forward-message format —
+  // formatRupiah() (denda.js) uses "Rp 20.000" with a space instead.
+  return 'Rp.' + (n || 0).toLocaleString('id-ID');
+}
+
+function buildTatibBmClassLines(c) {
+  return c.students
+    .map(s => `- ${s.nama} ${tatibBmViolationLabel(s)}, denda ${formatRupiahPlain(s.sisa)}`)
+    .join('\n');
+}
+
+function normalizeWaNumber(raw) {
+  let digits = (raw || '').replace(/\D/g, '');
+  if (digits.startsWith('0')) digits = '62' + digits.slice(1);
+  else if (!digits.startsWith('62')) digits = '62' + digits;
+  return digits;
+}
+
+function sendTatibBmWakelReminder() {
+  const c = tatibBmClassData.find(x => x.kelas === tatibBmSelectedKelas);
+  if (!c) return;
+  const wakel = tatibBmWakelMap[c.kelas];
+  if (!wakel || !wakel.whatsapp) {
+    showStatus('Nomor WhatsApp wali kelas belum terdaftar', 'error');
+    return;
   }
-  updateTatibBmStats();
 
-  // Re-sort: unchecked float to top
-  tatibBmData.sort((a, b) => {
-    if (a.checked !== b.checked) return a.checked ? 1 : -1;
-    return a.nama.localeCompare(b.nama);
-  });
-  onTatibBmSearch();
+  const message = `${c.kelas}\nwakel : ${wakel.nama || '-'}\n\n${buildTatibBmClassLines(c)}`;
+  const phone = normalizeWaNumber(wakel.whatsapp);
+  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
+}
+
+function sendTatibBmAllReport() {
+  if (tatibBmClassData.length === 0) return;
+
+  const now = new Intl.DateTimeFormat('id-ID', {
+    dateStyle: 'long', timeStyle: 'short', timeZone: 'Asia/Jakarta'
+  }).format(new Date());
+
+  const sections = tatibBmClassData
+    .map(c => `${c.kelas}\n${buildTatibBmClassLines(c)}`)
+    .join('\n\n');
+
+  const message = `Laporan siswa dengan denda ekskul (${now})\n\n${sections}`;
+
+  // No fixed recipient — opens WhatsApp's contact picker so it can be
+  // forwarded to whichever group or person needs it (e.g. kepala sekolah).
+  window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+}
+
+/* ===================================================
+   NILAI MINUS — kelas x point-deficit (2nd tab)
+   Same drill-down pattern as the denda Bermasalah screen,
+   just a different formula and no "admin accept" step —
+   points have no hand-over/confirmation stage, they're just
+   a live calculated balance.
+
+   nilai (poin) per student =
+     (alphaCount x Config.nilai_minus_alpha)
+     + (terlambatCount x Config.nilai_minus_terlambat)
+     + sum(Redemptions.poin for that student this semester)
+
+   nilai_minus_alpha/terlambat are configured as negative
+   values by default, so violations push nilai down;
+   Redemptions.poin (always positive per its DB check) adds
+   back on top to represent recovered points.
+
+   A student is flagged once nilai <= Config.minus_point_threshold
+   (also negative, e.g. -30). Respects minus_point_enable —
+   if the feature is off, the screen shows a disabled state
+   instead of computing anything.
+
+   Level 1 "classes": kelas + total point deficit, worst first
+   Level 2 "detail":   that class's flagged students + violation
+                        counts + individual nilai, plus
+                        "Ingatkan Wakel"
+   Plus bottom "Kirim Semua Laporan" on level 1.
+   =================================================== */
+let tatibMinusClassData = [];      // [{ kelas, totalMinus, students: [{nama, alphaCount, terlambatCount, nilai}] }]
+let tatibMinusView = 'classes';    // 'classes' | 'detail'
+let tatibMinusSelectedKelas = null;
+let tatibMinusWakelMap = {};
+let tatibMinusFeatureDisabled = false;
+
+function showTatibMinus() {
+  hideAllScreens();
+  const el = document.getElementById("tatibMinusScreen");
+  if (el) {
+    el.style.display = "flex";
+    initTatibMinus();
+  }
+}
+
+async function initTatibMinus() {
+  const container = document.getElementById("tatibMinusListContainer");
+  const empty = document.getElementById("tatibMinusEmpty");
+  const searchInput = document.getElementById("tatibMinusSearchInput");
+
+  if (container) container.innerHTML = "";
+  if (empty) empty.style.display = "none";
+  if (searchInput) {
+    searchInput.value = "";
+    searchInput.placeholder = "Cari kelas...";
+  }
+
+  tatibMinusView = 'classes';
+  tatibMinusSelectedKelas = null;
 
   showLoading(true);
   try {
-    if (newChecked) {
-      const { error } = await sb.from('TatibCheck').upsert({
-        student_id: studentId,
-        semester: currentSemester,
-        checked_by: currentOperator || 'Tatib',
-        checked_at: new Date().toISOString()
-      });
-      if (error) throw error;
-      showStatus("✓ Ditandai sudah ditindak", "ok");
+    await fetchTatibMinusData();
+
+    if (tatibMinusFeatureDisabled) {
+      if (container) container.innerHTML = "";
+      if (empty) {
+        empty.style.display = "block";
+        const txt = empty.querySelector(".empty-state-text");
+        if (txt) txt.textContent = "Fitur nilai minus sedang dinonaktifkan (Config: minus_point_enable)";
+      }
     } else {
-      const { error } = await sb
-        .from('TatibCheck')
-        .delete()
-        .eq('student_id', studentId)
-        .eq('semester', currentSemester);
-      if (error) throw error;
-      showStatus("✓ Batal ditandai", "ok");
+      renderTatibMinusView();
+      if (tatibMinusClassData.length === 0 && empty) {
+        empty.style.display = "block";
+        const txt = empty.querySelector(".empty-state-text");
+        if (txt) txt.textContent = "Tidak ada kelas dengan nilai minus";
+      }
     }
   } catch (err) {
-    showStatus("Error: " + err.message, "error");
-    student.checked = !newChecked;
-    updateTatibBmStats();
-    onTatibBmSearch();
+    console.error(err);
+    showStatus("Gagal memuat data: " + err.message, "error");
+    if (empty) {
+      empty.style.display = "block";
+      const txt = empty.querySelector(".empty-state-text");
+      if (txt) txt.textContent = "Gagal memuat data";
+    }
   }
   showLoading(false);
+}
+
+async function fetchTatibMinusData() {
+  const config = await loadSupabaseConfig();
+
+  if (!config.minusPointEnable) {
+    tatibMinusFeatureDisabled = true;
+    tatibMinusClassData = [];
+    return;
+  }
+  tatibMinusFeatureDisabled = false;
+
+  const nilaiMinusAlpha = config.nilaiMinusAlpha || 0;
+  const nilaiMinusTerlambat = config.nilaiMinusTerlambat || 0;
+  const threshold = config.minusPointThreshold ?? -30;
+
+  const { data: students, error: sErr } = await sb.from('Database').select('id, nama, kelas');
+  if (sErr) throw new Error("Gagal memuat database: " + sErr.message);
+
+  const { data: violations, error: vErr } = await sb
+    .from('AttendanceV2')
+    .select('student_id, status')
+    .eq('semester', currentSemester)
+    .in('status', ['ALPHA', 'TERLAMBAT', 'TELAT']);
+  if (vErr) throw new Error("Gagal memuat pelanggaran: " + vErr.message);
+
+  const { data: redemptions, error: rErr } = await sb
+    .from('Redemptions')
+    .select('student_id, poin')
+    .eq('semester', currentSemester);
+  if (rErr) throw new Error("Gagal memuat redemptions: " + rErr.message);
+
+  const { data: wakelRows, error: wErr } = await sb.from('Wakel').select('kelas, nama, whatsapp');
+  if (wErr) console.warn("Wakel load:", wErr.message);
+  tatibMinusWakelMap = {};
+  (wakelRows || []).forEach(w => { tatibMinusWakelMap[w.kelas] = w; });
+
+  const violationCounts = {};
+  (violations || []).forEach(v => {
+    if (!violationCounts[v.student_id]) violationCounts[v.student_id] = { alpha: 0, terlambat: 0 };
+    const st = (v.status || '').trim().toUpperCase();
+    if (st === 'ALPHA') violationCounts[v.student_id].alpha++;
+    else violationCounts[v.student_id].terlambat++;
+  });
+
+  const redemptionSums = {};
+  (redemptions || []).forEach(r => {
+    redemptionSums[r.student_id] = (redemptionSums[r.student_id] || 0) + (r.poin || 0);
+  });
+
+  const byClass = {};
+  (students || []).forEach(s => {
+    const v = violationCounts[s.id] || { alpha: 0, terlambat: 0 };
+    const nilai = (v.alpha * nilaiMinusAlpha) + (v.terlambat * nilaiMinusTerlambat) + (redemptionSums[s.id] || 0);
+
+    // nilai < 0 is a hard guard on top of the threshold check — a student
+    // sitting at exactly 0 (no real deficit) should never show up here,
+    // even if Config.minus_point_threshold were ever set to 0 or above.
+    if (nilai < 0 && nilai <= threshold) {
+      const kelas = s.kelas || 'Tanpa Kelas';
+      if (!byClass[kelas]) byClass[kelas] = { kelas, totalMinus: 0, students: [] };
+      byClass[kelas].totalMinus += nilai;
+      byClass[kelas].students.push({
+        nama: s.nama,
+        alphaCount: v.alpha,
+        terlambatCount: v.terlambat,
+        nilai
+      });
+    }
+  });
+
+  // Most negative (worst) class first; worst student first within a class.
+  tatibMinusClassData = Object.values(byClass).sort((a, b) => a.totalMinus - b.totalMinus);
+  tatibMinusClassData.forEach(c => c.students.sort((a, b) => a.nilai - b.nilai));
+}
+
+function renderTatibMinusView() {
+  if (tatibMinusView === 'detail') return renderTatibMinusDetailView();
+  return renderTatibMinusClassesView();
+}
+
+function onTatibMinusSearch() {
+  renderTatibMinusView();
+}
+
+function formatPoin(n) {
+  return (n || 0).toLocaleString('id-ID');
+}
+
+// Level 1: kelas + total point deficit, worst first.
+function renderTatibMinusClassesView() {
+  const container = document.getElementById("tatibMinusListContainer");
+  if (!container) return;
+
+  const q = (document.getElementById("tatibMinusSearchInput")?.value || '').trim().toLowerCase();
+  const list = !q ? tatibMinusClassData : tatibMinusClassData.filter(c => c.kelas.toLowerCase().includes(q));
+
+  const empty = document.getElementById("tatibMinusEmpty");
+  if (empty) empty.style.display = (tatibMinusClassData.length > 0 && list.length === 0) ? "block" : "none";
+
+  if (tatibMinusClassData.length === 0) { container.innerHTML = ""; return; }
+
+  const rows = list.map(c => `
+    <div class="tatib-debt-row" onclick="openTatibMinusClass('${encodeURIComponent(c.kelas)}')">
+      <div class="tatib-debt-main">
+        <div class="tatib-debt-name">${escapeHtml(c.kelas)}</div>
+        <div class="tatib-debt-class">${c.students.length} siswa bermasalah</div>
+      </div>
+      <div class="tatib-debt-badge">
+        <div class="tatib-debt-amount">${formatPoin(c.totalMinus)}</div>
+        <div class="tatib-debt-sub">total poin minus</div>
+      </div>
+    </div>
+  `).join('');
+
+  container.innerHTML = rows + `
+    <button class="tatib-bm-action-btn green" onclick="sendTatibMinusAllReport()">
+      📤 Kirim Semua Laporan
+    </button>
+  `;
+}
+
+function openTatibMinusClass(encodedKelas) {
+  tatibMinusSelectedKelas = decodeURIComponent(encodedKelas);
+  tatibMinusView = 'detail';
+  renderTatibMinusView();
+}
+
+function backTatibMinusToClasses() {
+  tatibMinusView = 'classes';
+  tatibMinusSelectedKelas = null;
+  renderTatibMinusView();
+}
+
+// Level 2: that class's flagged students + violation breakdown + nilai.
+function renderTatibMinusDetailView() {
+  const container = document.getElementById("tatibMinusListContainer");
+  if (!container) return;
+  const empty = document.getElementById("tatibMinusEmpty");
+  if (empty) empty.style.display = "none";
+
+  const c = tatibMinusClassData.find(x => x.kelas === tatibMinusSelectedKelas);
+  if (!c) { tatibMinusView = 'classes'; return renderTatibMinusView(); }
+
+  const wakel = tatibMinusWakelMap[c.kelas];
+
+  const rows = c.students.map(s => `
+    <div class="denda-fab-payment">
+      <span class="denda-fab-payment-name">${escapeHtml(s.nama)} — ${escapeHtml(tatibBmViolationLabel(s))}</span>
+      <span class="denda-fab-payment-amount">${formatPoin(s.nilai)}</span>
+    </div>
+  `).join('');
+
+  const wakelLine = wakel
+    ? `<div class="tatib-detail-class" style="padding:0 4px 12px;">Wakel: ${escapeHtml(wakel.nama || '-')}</div>`
+    : `<div class="tatib-pay-hint error" style="padding:0 4px 12px;">Nomor wali kelas belum terdaftar di tabel Wakel</div>`;
+
+  container.innerHTML = `
+    <div class="denda-fab-back" onclick="backTatibMinusToClasses()">‹ Semua Kelas</div>
+    <div class="denda-fab-header-title">${escapeHtml(c.kelas)} • ${formatPoin(c.totalMinus)} poin</div>
+    ${wakelLine}
+    ${rows}
+    <button class="tatib-bm-action-btn" onclick="sendTatibMinusWakelReminder()" ${wakel && wakel.whatsapp ? '' : 'disabled'}>
+      💬 Ingatkan Wakel
+    </button>
+  `;
+}
+
+function buildTatibMinusClassLines(c) {
+  return c.students
+    .map(s => `- ${s.nama} ${tatibBmViolationLabel(s)}, poin ${formatPoin(s.nilai)}`)
+    .join('\n');
+}
+
+function sendTatibMinusWakelReminder() {
+  const c = tatibMinusClassData.find(x => x.kelas === tatibMinusSelectedKelas);
+  if (!c) return;
+  const wakel = tatibMinusWakelMap[c.kelas];
+  if (!wakel || !wakel.whatsapp) {
+    showStatus('Nomor WhatsApp wali kelas belum terdaftar', 'error');
+    return;
+  }
+
+  const message = `${c.kelas}\nwakel : ${wakel.nama || '-'}\n\n${buildTatibMinusClassLines(c)}`;
+  const phone = normalizeWaNumber(wakel.whatsapp);
+  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
+}
+
+function sendTatibMinusAllReport() {
+  if (tatibMinusClassData.length === 0) return;
+
+  const now = new Intl.DateTimeFormat('id-ID', {
+    dateStyle: 'long', timeStyle: 'short', timeZone: 'Asia/Jakarta'
+  }).format(new Date());
+
+  const sections = tatibMinusClassData
+    .map(c => `${c.kelas}\n${buildTatibMinusClassLines(c)}`)
+    .join('\n\n');
+
+  const message = `Laporan siswa dengan nilai minus (${now})\n\n${sections}`;
+  window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
 }
