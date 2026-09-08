@@ -408,3 +408,38 @@
   color: white;
   border-color: var(--accent);
 }
+
+/* ===== BERMASALAH — WA ACTION BUTTONS ===== */
+.tatib-bm-action-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 16px;
+  margin-top: 16px;
+  border: none;
+  border-radius: 16px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s, opacity 0.15s;
+}
+
+.tatib-bm-action-btn:active { transform: scale(0.97); }
+
+.tatib-bm-action-btn.green { background: var(--green); }
+
+.tatib-bm-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+#tatibMinusScreen {
+  display: none;
+  flex-direction: column;
+  height: 100dvh;
+  background: var(--bg);
+}
