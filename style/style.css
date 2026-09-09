@@ -1277,6 +1277,37 @@ paperCameraSection {
   cursor: not-allowed;
   box-shadow: none;
 }
+/* ===== INLINE SEARCH BAR (syarat khusus / daftar siswa) ===== */
+.inline-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 16px 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  flex-shrink: 0;
+}
+.inline-search-icon {
+  font-size: 14px;
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+.inline-search-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  outline: none;
+}
+.inline-search-input::placeholder {
+  color: var(--text-secondary);
+}
+
 /* ===== DAFTAR TOP BAR ===== */
 .daftar-top-bar {
   display: flex;

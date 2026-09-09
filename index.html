@@ -897,6 +897,10 @@
     <div class="reg-title">Daftar Siswa di Ekskul</div>
      </div>
 
+  <div class="tatib-search-wrap">
+    <input type="text" id="daftarSearchInput" class="tatib-search-input" placeholder="Cari nama siswa..." oninput="handleDaftarSearch()" autocomplete="off">
+  </div>
+
   <div class="daftar-top-bar">
     <div class="daftar-count">
       <span class="daftar-count-num" id="daftarStatTotal">0</span>
@@ -916,7 +920,7 @@
   <div class="daftar-list-container" id="daftarList"></div>
   <div class="empty-state" id="daftarEmpty" style="display:none;">
     <div class="empty-state-icon">📭</div>
-    <div class="empty-state-text">Tidak ada siswa</div>
+    <div class="empty-state-text" id="daftarEmptyText">Tidak ada siswa</div>
   </div>
 </div>
 
@@ -980,6 +984,10 @@
     <div class="reg-title">Syarat Khusus</div>
       </div>
 
+  <div class="tatib-search-wrap">
+    <input type="text" id="syaratSearchInput" class="tatib-search-input" placeholder="Cari nama siswa..." oninput="handleSyaratSearch()" autocomplete="off">
+  </div>
+
   <div class="stats-bar">
     <div class="stat-card">
       <div class="stat-label">TOTAL</div>
@@ -999,7 +1007,7 @@
   
   <div class="empty-state" id="syaratEmpty" style="display:none;">
     <div class="empty-state-icon">📭</div>
-    <div class="empty-state-text">Tidak ada siswa</div>
+    <div class="empty-state-text" id="syaratEmptyText">Tidak ada siswa</div>
   </div>
 
   <!-- Fixed bottom save bar -->

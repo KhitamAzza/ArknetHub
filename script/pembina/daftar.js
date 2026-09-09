@@ -3,13 +3,16 @@ let daftarStudents = [];
 let daftarCurrentSort = "hadir";
 let expandedStudent = null;
 let selectedStudentForRemove = null;
+let daftarSearchQuery = "";
 
 // ===== DOM REFS =====
 const daftarScreen = document.getElementById("daftarScreen");
 const daftarList = document.getElementById("daftarList");
 const daftarEmpty = document.getElementById("daftarEmpty");
+const daftarEmptyText = document.getElementById("daftarEmptyText");
 const daftarStatTotal = document.getElementById("daftarStatTotal");
 const daftarSortSelect = document.getElementById("daftarSortSelect");
+const daftarSearchInput = document.getElementById("daftarSearchInput");
 
 const removeModal = document.getElementById("removeModal");
 const removeStudentName = document.getElementById("removeStudentName");
@@ -80,6 +83,8 @@ async function loadDaftarStudents() {
 
     daftarCurrentSort = "hadir";
     if (daftarSortSelect) daftarSortSelect.value = "hadir";
+    daftarSearchQuery = "";
+    if (daftarSearchInput) daftarSearchInput.value = "";
     applySort();
     updateDaftarCount();
     renderDaftarList();
@@ -87,6 +92,12 @@ async function loadDaftarStudents() {
     showStatus("Error memuat data: " + err.message, "error");
   }
   showLoading(false);
+}
+
+// ===== SEARCH =====
+function handleDaftarSearch() {
+  daftarSearchQuery = daftarSearchInput ? daftarSearchInput.value : "";
+  renderDaftarList();
 }
 
 function updateDaftarCount() {
@@ -120,10 +131,26 @@ function applySort() {
 
 function renderDaftarList() {
   daftarList.innerHTML = "";
-  if (daftarStudents.length === 0) { daftarEmpty.style.display = "block"; return; }
+  if (daftarStudents.length === 0) {
+    if (daftarEmptyText) daftarEmptyText.textContent = "Tidak ada siswa";
+    daftarEmpty.style.display = "block";
+    return;
+  }
+
+  const q = daftarSearchQuery.trim().toLowerCase();
+  const filtered = q
+    ? daftarStudents.filter(s => (s.nama || "").toLowerCase().includes(q))
+    : daftarStudents;
+
+  if (filtered.length === 0) {
+    if (daftarEmptyText) daftarEmptyText.textContent = "Siswa tidak ditemukan";
+    daftarEmpty.style.display = "block";
+    return;
+  }
+
   daftarEmpty.style.display = "none";
 
-  daftarStudents.forEach((s) => {
+  filtered.forEach((s) => {
     const isExpanded = expandedStudent && expandedStudent.nama === s.nama;
     const item = document.createElement("div");
     item.className = "daftar-item" + (isExpanded ? " expanded" : "");

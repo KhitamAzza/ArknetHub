@@ -1,15 +1,18 @@
 // ===== SYARAT KHUSUS STATE =====
 let syaratStudents = [];
 let syaratChanges = new Map(); // nama → "SUDAH" | "BELUM"
+let syaratSearchQuery = "";
 
 // ===== DOM REFS =====
 const syaratScreen = document.getElementById("syaratScreen");
 const syaratList = document.getElementById("syaratList");
 const syaratEmpty = document.getElementById("syaratEmpty");
+const syaratEmptyText = document.getElementById("syaratEmptyText");
 const syaratStatTotal = document.getElementById("syaratStatTotal");
 const syaratStatDone = document.getElementById("syaratStatDone");
 const syaratStatPending = document.getElementById("syaratStatPending");
 const syaratSaveBtn = document.getElementById("syaratSaveBtn");
+const syaratSearchInput = document.getElementById("syaratSearchInput");
 
 // ===== SHOW SYARAT SCREEN =====
 function showSyaratKhusus() {
@@ -54,12 +57,20 @@ async function loadSyaratStudents() {
     }));
 
     syaratChanges.clear();
+    syaratSearchQuery = "";
+    if (syaratSearchInput) syaratSearchInput.value = "";
     updateSyaratStats();
     renderSyaratList();
   } catch (err) {
     showStatus("Error memuat data: " + err.message, "error");
   }
   showLoading(false);
+}
+
+// ===== SEARCH =====
+function handleSyaratSearch() {
+  syaratSearchQuery = syaratSearchInput ? syaratSearchInput.value : "";
+  renderSyaratList();
 }
 
 // ===== STATS =====
@@ -94,13 +105,25 @@ function renderSyaratList() {
   syaratList.innerHTML = "";
 
   if (syaratStudents.length === 0) {
+    if (syaratEmptyText) syaratEmptyText.textContent = "Tidak ada siswa";
+    syaratEmpty.style.display = "block";
+    return;
+  }
+
+  const q = syaratSearchQuery.trim().toLowerCase();
+  const filtered = q
+    ? syaratStudents.filter(s => (s.nama || "").toLowerCase().includes(q))
+    : syaratStudents;
+
+  if (filtered.length === 0) {
+    if (syaratEmptyText) syaratEmptyText.textContent = "Siswa tidak ditemukan";
     syaratEmpty.style.display = "block";
     return;
   }
 
   syaratEmpty.style.display = "none";
 
-  syaratStudents.forEach((s) => {
+  filtered.forEach((s) => {
     const currentVal = syaratChanges.get(s.nama) || s.syarat || "BELUM";
     const isSudah = currentVal === "SUDAH";
 
