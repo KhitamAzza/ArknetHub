@@ -476,7 +476,9 @@ function renderConfigMenu() {
       items: [
         { key: "minusPointEnable", label: "Sistem point (Minus point)", type: "toggle" },
         { key: "minusPointThreshold", label: "MINUS POINT THRESHOLD", type: "number" },
-        { key: "redemptionEnable", label: "sistem penebusan (redemption)", type: "toggle" }
+        { key: "redemptionEnable", label: "sistem penebusan (redemption)", type: "toggle" },
+        { key: "maxPointSubmit", label: "Maks pengiriman nilai per guru/hari", type: "number" },
+        { key: "maxRedemptionPoint", label: "Maks poin per pengiriman (skala slider)", type: "number" }
       ]
     },
     {
