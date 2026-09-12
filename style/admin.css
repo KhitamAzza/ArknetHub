@@ -783,6 +783,37 @@
   gap: 10px;
 }
 
+.bermasalah-sort-chips {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  overflow-x: auto;
+}
+
+.bermasalah-sort-chip {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.bermasalah-sort-chip:active {
+  transform: scale(0.96);
+}
+
+.bermasalah-sort-chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
 .bermasalah-item {
   display: flex;
   align-items: center;
@@ -822,15 +853,37 @@
 
 .bermasalah-info { flex: 1; min-width: 0; }
 
+.bermasalah-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bermasalah-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .bermasalah-name {
   font-size: 15px;
   font-weight: 700;
-  margin-bottom: 2px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .bermasalah-meta {
   font-size: 12px;
   color: var(--text-secondary);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .bermasalah-alpha {
@@ -841,6 +894,37 @@
   padding: 4px 10px;
   border-radius: 20px;
   flex-shrink: 0;
+}
+
+.bermasalah-status-badge {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--red);
+  background: rgba(239,68,68,0.1);
+  padding: 4px 10px;
+  border-radius: 20px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.bermasalah-status-badge.is-secondary {
+  font-size: 11px;
+  padding: 3px 9px;
+}
+
+.bermasalah-status-badge.badge-alpha {
+  color: var(--red);
+  background: rgba(239,68,68,0.1);
+}
+
+.bermasalah-status-badge.badge-terlambat {
+  color: var(--yellow);
+  background: rgba(234,179,8,0.12);
+}
+
+.bermasalah-status-badge.badge-pagi {
+  color: var(--accent);
+  background: rgba(59,130,246,0.12);
 }
 
 .bermasalah-expel-btn {
