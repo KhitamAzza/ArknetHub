@@ -757,8 +757,14 @@
 
     <div class="kelola-section" style="margin-top:8px;">
       <div class="kelola-section-title" style="display:flex;justify-content:space-between;align-items:center;">
-        <span>Ranking Alpha Tertinggi</span>
+        <span id="bermasalahSectionTitle">Ranking Tertinggi</span>
         <span style="font-size:11px;color:var(--text-secondary);font-weight:500;" id="bermasalahCountLabel">0 siswa</span>
+      </div>
+      <div class="bermasalah-sort-chips">
+        <button class="bermasalah-sort-chip active" data-sort="tertinggi" onclick="setBermasalahSort('tertinggi')">Tertinggi</button>
+        <button class="bermasalah-sort-chip" data-sort="alpha" onclick="setBermasalahSort('alpha')">Alpha</button>
+        <button class="bermasalah-sort-chip" data-sort="terlambat" onclick="setBermasalahSort('terlambat')">Terlambat</button>
+        <button class="bermasalah-sort-chip" data-sort="pagi" onclick="setBermasalahSort('pagi')">Pagi</button>
       </div>
     </div>
 
