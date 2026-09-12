@@ -1038,7 +1038,66 @@ async function saveKelolaEkstra() {
 let tanpaEkstraStudents = [];
 let bermasalahStudents = [];
 let bermasalahFiltered = [];
+let bermasalahSortBy = 'tertinggi'; // 'tertinggi' | 'alpha' | 'terlambat' | 'pagi'
 let expelTarget = null;
+
+// Sorts a copy of the given array by the chosen criterion.
+// 'tertinggi' = whichever count (Alpha/Terlambat/Pagi) is highest for that student wins,
+// regardless of which category it is — this is what puts a 6x Terlambat student
+// above a 5x Alpha student, for example.
+function sortBermasalahArray(arr, field) {
+  const copy = [...arr];
+  if (field === 'alpha') {
+    copy.sort((a, b) =>
+      b.alphaCount - a.alphaCount ||
+      b.terlambatCount - a.terlambatCount ||
+      b.pagiCount - a.pagiCount
+    );
+  } else if (field === 'terlambat') {
+    copy.sort((a, b) =>
+      b.terlambatCount - a.terlambatCount ||
+      b.alphaCount - a.alphaCount ||
+      b.pagiCount - a.pagiCount
+    );
+  } else if (field === 'pagi') {
+    copy.sort((a, b) =>
+      b.pagiCount - a.pagiCount ||
+      b.alphaCount - a.alphaCount ||
+      b.terlambatCount - a.terlambatCount
+    );
+  } else { // 'tertinggi'
+    copy.sort((a, b) =>
+      b.maxCount - a.maxCount ||
+      b.alphaCount - a.alphaCount ||
+      b.terlambatCount - a.terlambatCount ||
+      b.pagiCount - a.pagiCount
+    );
+  }
+  return copy;
+}
+
+function setBermasalahSort(field) {
+  bermasalahSortBy = field;
+  bermasalahStudents = sortBermasalahArray(bermasalahStudents, field);
+  filterBermasalahList(); // re-applies current search + new sort, then renders
+  updateBermasalahSortUI();
+}
+
+function updateBermasalahSortUI() {
+  document.querySelectorAll('.bermasalah-sort-chip').forEach(chip => {
+    chip.classList.toggle('active', chip.dataset.sort === bermasalahSortBy);
+  });
+  const titleEl = document.getElementById('bermasalahSectionTitle');
+  if (titleEl) {
+    const labels = {
+      tertinggi: 'Ranking Tertinggi',
+      alpha: 'Ranking Alpha Tertinggi',
+      terlambat: 'Ranking Terlambat Tertinggi',
+      pagi: 'Ranking Pagi Tertinggi'
+    };
+    titleEl.textContent = labels[bermasalahSortBy] || 'Ranking Tertinggi';
+  }
+}
 
 async function loadBermasalahData() {
   showLoading(true);
@@ -1055,39 +1114,57 @@ async function loadBermasalahData() {
       return !e || e === '0';
     });
 
-    // 3. Alpha counts for current semester
-    const { data: alphaRows, error: alphaErr } = await sb
+    // 3. Alpha / Terlambat / Pagi counts for current semester
+    const { data: statusRows, error: statusErr } = await sb
   .from('AttendanceV2')
-  .select('student_id')
+  .select('student_id, status')
   .eq('semester', currentSemester)
-  .eq('status', 'ALPHA');
-    if (alphaErr) throw alphaErr;
+  .in('status', ['ALPHA', 'TERLAMBAT', 'PAGI']);
+    if (statusErr) throw statusErr;
 
     const alphaCounts = {};
-    (alphaRows || []).forEach(a => {
-      alphaCounts[a.student_id] = (alphaCounts[a.student_id] || 0) + 1;
+    const terlambatCounts = {};
+    const pagiCounts = {};
+    (statusRows || []).forEach(a => {
+      if (a.status === 'ALPHA') {
+        alphaCounts[a.student_id] = (alphaCounts[a.student_id] || 0) + 1;
+      } else if (a.status === 'TERLAMBAT') {
+        terlambatCounts[a.student_id] = (terlambatCounts[a.student_id] || 0) + 1;
+      } else if (a.status === 'PAGI') {
+        pagiCounts[a.student_id] = (pagiCounts[a.student_id] || 0) + 1;
+      }
     });
 
     // 4. Build bermasalah list
     //    - MUST have an ekstra (not empty, not '0')
-    //    - MUST have alpha > 0
-    //    - Sorted highest alpha first
+    //    - MUST have alpha, terlambat, or pagi > 0
+    //    - Sorted per the current bermasalahSortBy setting
     bermasalahStudents = (allStudents || [])
       .filter(s => {
         const e = (s.ekstra || '').trim();
         return e && e !== '0';           // ← HAS ekstra
       })
-      .filter(s => alphaCounts[s.id] > 0) // ← HAS alpha
-      .map(s => ({
-        ...s,
-        alphaCount: alphaCounts[s.id]
-      }))
-      .sort((a, b) => b.alphaCount - a.alphaCount);
+      .map(s => {
+        const alphaCount = alphaCounts[s.id] || 0;
+        const terlambatCount = terlambatCounts[s.id] || 0;
+        const pagiCount = pagiCounts[s.id] || 0;
+        return {
+          ...s,
+          alphaCount,
+          terlambatCount,
+          pagiCount,
+          maxCount: Math.max(alphaCount, terlambatCount, pagiCount)
+        };
+      })
+      .filter(s => s.alphaCount > 0 || s.terlambatCount > 0 || s.pagiCount > 0); // ← HAS a problem status
+
+    bermasalahStudents = sortBermasalahArray(bermasalahStudents, bermasalahSortBy);
 
     bermasalahFiltered = [...bermasalahStudents];
 
     renderTanpaEkstraBadge();
     renderBermasalahList();
+    updateBermasalahSortUI();
   } catch (err) {
     console.error("Bermasalah load failed:", err);
     showStatus("Gagal memuat data", "error");
@@ -1108,38 +1185,6 @@ function renderTanpaEkstraBadge() {
     banner.style.display = tanpaEkstraStudents.length > 0 ? "flex" : "none";
   }
 }
-function renderBermasalahList() {
-  const list = document.getElementById("bermasalahList");
-  const empty = document.getElementById("bermasalahEmpty");
-  const countLabel = document.getElementById("bermasalahCountLabel");
-  
-  if (!list) return;
-
-  if (countLabel) countLabel.textContent = `${bermasalahFiltered.length} siswa`;
-
-  if (!bermasalahFiltered.length) {
-    list.innerHTML = "";
-    if (empty) empty.style.display = "block";
-    return;
-  }
-  if (empty) empty.style.display = "none";
-
-  list.innerHTML = bermasalahFiltered.map(s => {
-    const hasPhoto = !!s.photo_url;
-    return `
-    <div class="bermasalah-item">
-      ${hasPhoto ? `<img class="bermasalah-photo" src="${escapeHtml(s.photo_url)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">` : ''}
-      <div class="bermasalah-photo-placeholder" style="${hasPhoto ? 'display:none;' : ''}">👤</div>
-      <div class="bermasalah-info">
-        <div class="bermasalah-name">${escapeHtml(s.nama)}</div>
-        <div class="bermasalah-meta">${escapeHtml(s.kelas)} • ${escapeHtml(s.ekstra || '-')}</div>
-      </div>
-      <div class="bermasalah-alpha">${s.alphaCount} Alpha</div>
-      <button class="bermasalah-expel-btn" onclick="openExpelModal('${s.id}')">Keluarkan</button>
-    </div>
-  `}).join('');
-}
-
 function filterBermasalahList() {
   const input = document.getElementById("bermasalahSearchInput");
   const q = (input ? input.value : "").trim().toLowerCase();
@@ -1210,15 +1255,34 @@ function renderBermasalahList() {
     const hasPhoto = !!s.photo_url;
     // FIX: escape single quotes in ID so onclick doesn't break
     const safeId = String(s.id).replace(/'/g, "\\'");
+
+    // Build badges in priority order: Alpha > Terlambat > Pagi
+    const badges = [];
+    if (s.alphaCount > 0) badges.push({ cls: 'badge-alpha', text: `${s.alphaCount}x Alpha` });
+    if (s.terlambatCount > 0) badges.push({ cls: 'badge-terlambat', text: `${s.terlambatCount}x Terlambat` });
+    if (s.pagiCount > 0) badges.push({ cls: 'badge-pagi', text: `${s.pagiCount}x Pagi` });
+
+    const primaryBadge = badges[0]
+      ? `<div class="bermasalah-status-badge ${badges[0].cls}">${badges[0].text}</div>`
+      : '';
+    const secondaryBadge = badges[1]
+      ? `<div class="bermasalah-status-badge is-secondary ${badges[1].cls}">${badges[1].text}</div>`
+      : '';
+
     return `
     <div class="bermasalah-item">
       ${hasPhoto ? `<img class="bermasalah-photo" src="${escapeHtml(s.photo_url)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">` : ''}
       <div class="bermasalah-photo-placeholder" style="${hasPhoto ? 'display:none;' : ''}">👤</div>
-      <div class="bermasalah-info">
-        <div class="bermasalah-name">${escapeHtml(s.nama)}</div>
-        <div class="bermasalah-meta">${escapeHtml(s.kelas)} • ${escapeHtml(s.ekstra || '-')}</div>
+      <div class="bermasalah-body">
+        <div class="bermasalah-row">
+          <div class="bermasalah-name">${escapeHtml(s.nama)}</div>
+          ${primaryBadge}
+        </div>
+        <div class="bermasalah-row">
+          <div class="bermasalah-meta">${escapeHtml(s.kelas)} • ${escapeHtml(s.ekstra || '-')}</div>
+          ${secondaryBadge}
+        </div>
       </div>
-      <div class="bermasalah-alpha">${s.alphaCount} Alpha</div>
       <button class="bermasalah-expel-btn" onclick="openExpelModal('${safeId}')">Keluarkan</button>
     </div>
   `}).join('');
