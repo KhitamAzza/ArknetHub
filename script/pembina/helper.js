@@ -2,8 +2,31 @@
 // helper.js — Panitia mode: Catat Keterlambatan (TELAT)
 // ============================================
 
-let helperLateStudents = [];   // {nama, kelas}
-let todayTelatStudents = [];   // students already marked TELAT today
+let helperLateStudents = [];   // {id, nama, kelas}
+let todayTelatStudents = [];   // students already marked TERLAMBAT today (for the "lihat" modal)
+let todayAttendanceIds = new Set(); // student ids with ANY AttendanceV2 row today (any status) — used for duplicate detection
+let pendingDuplicate = null;   // {id, nama, kelas} awaiting confirmation in the "sudah didata" warning modal
+
+// ===== STYLES (injected once — no separate CSS file for this page) =====
+(function injectHelperDuplicateStyles() {
+  if (document.getElementById('helperDuplicateStyles')) return;
+  const style = document.createElement('style');
+  style.id = 'helperDuplicateStyles';
+  style.textContent = `
+    .predictive-item-tagged { opacity: 0.85; }
+    .pred-tag {
+      display: inline-block;
+      margin-top: 4px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--red, #ef4444);
+      font-size: 11px;
+      font-weight: 700;
+    }
+  `;
+  document.head.appendChild(style);
+})();
 
 // ===== DEBOUNCE UTILITY =====
 function debounce(fn, ms) {
@@ -28,7 +51,7 @@ function showLateRecord() {
 
   helperLateStudents = [];
   renderLateSelected();
-  loadTelatStudents();
+  loadTodayAttendance();
 
   const countdownWrap = document.querySelector(".late-countdown");
   if (countdownWrap) {
@@ -45,9 +68,14 @@ function showLateRecord() {
     pred.onclick = (e) => {
       const item = e.target.closest(".predictive-item");
       if (!item) return;
+      const id = item.dataset.id;
       const nama = decodeURIComponent(item.dataset.nama);
       const kelas = decodeURIComponent(item.dataset.kelas || "");
-      addLateStudent(nama, kelas);
+      if (item.classList.contains("predictive-item-tagged")) {
+        openDuplicateWarning(id, nama, kelas);
+      } else {
+        addLateStudent(id, nama, kelas);
+      }
     };
   }
   if (list) {
@@ -73,19 +101,23 @@ function closePredictiveOutside(e) {
   }
 }
 
-async function loadTelatStudents() {
+async function loadTodayAttendance() {
   try {
     const today = getJakartaDateString();
     const { data: attRows, error: attErr } = await sb
-  .from('AttendanceV2')
-  .select('student_id')
-  .eq('date', today)
-  .eq('semester', currentSemester)
-  .eq('status', 'TERLAMBAT');
+      .from('AttendanceV2')
+      .select('student_id, status')
+      .eq('date', today)
+      .eq('semester', currentSemester);
 
     if (attErr) throw attErr;
 
-    const telatIds = (attRows || []).map(d => d.student_id);
+    const rows = attRows || [];
+    // Any status counts as "already recorded" — the DB's unique constraint is on
+    // (student_id, date, semester) regardless of status, so this must match it.
+    todayAttendanceIds = new Set(rows.map(r => r.student_id));
+
+    const telatIds = rows.filter(r => r.status === 'TERLAMBAT').map(r => r.student_id);
     if (telatIds.length === 0) {
       todayTelatStudents = [];
       return;
@@ -99,14 +131,15 @@ async function loadTelatStudents() {
     if (sErr) throw sErr;
     todayTelatStudents = students || [];
   } catch (e) {
-    console.error("Failed to load TELAT students", e);
+    console.error("Failed to load today's attendance", e);
+    todayAttendanceIds = new Set();
     todayTelatStudents = [];
   }
 }
 
 // ===== TELAT LIST MODAL =====
 async function showTelatModal() {
-  await loadTelatStudents();
+  await loadTodayAttendance();
 
   let modal = document.getElementById("telatListModal");
   if (!modal) {
@@ -154,6 +187,80 @@ function closeTelatModal() {
   if (modal) modal.classList.remove("visible");
 }
 
+// ===== "SUDAH DIDATA" DUPLICATE WARNING MODAL =====
+function openDuplicateWarning(id, nama, kelas) {
+  pendingDuplicate = { id, nama, kelas };
+
+  let modal = document.getElementById("duplicateWarningModal");
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.id = "duplicateWarningModal";
+    modal.className = "modal-overlay";
+    modal.innerHTML = `
+      <div class="modal-sheet">
+        <div class="modal-header">
+          <div class="modal-title">Siswa Sudah Didata</div>
+          <button class="icon-btn" onclick="closeDuplicateWarning()" style="width:32px;height:32px;font-size:16px;">✕</button>
+        </div>
+        <div class="modal-body" id="duplicateWarningBody" style="padding:16px 20px;"></div>
+        <div class="modal-footer">
+          <button class="btn-secondary" onclick="closeDuplicateWarning()">Kembali</button>
+          <button class="btn-primary" style="background:var(--red, #ef4444);" onclick="confirmDeleteDuplicate()">Hapus</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+
+  const body = document.getElementById("duplicateWarningBody");
+  if (body) {
+    body.innerHTML = `
+      <div style="font-size:14px;color:var(--text-secondary);">
+        <b style="color:var(--text);">${escapeHtml(nama)}</b>${kelas ? ` (${escapeHtml(kelas)})` : ''} sudah didata. Apakah Anda ingin menghapus dari data?
+      </div>
+    `;
+  }
+
+  modal.classList.add("visible");
+}
+
+function closeDuplicateWarning() {
+  const modal = document.getElementById("duplicateWarningModal");
+  if (modal) modal.classList.remove("visible");
+  pendingDuplicate = null;
+}
+
+async function confirmDeleteDuplicate() {
+  if (!pendingDuplicate) return;
+  const { id, nama } = pendingDuplicate;
+  closeDuplicateWarning();
+
+  const inWaitingList = helperLateStudents.some(s => s.id === id);
+  const inDatabase = todayAttendanceIds.has(id);
+
+  showLoading(true);
+  try {
+    if (inWaitingList) {
+      helperLateStudents = helperLateStudents.filter(s => s.id !== id);
+      renderLateSelected();
+    }
+    if (inDatabase) {
+      const today = getJakartaDateString();
+      const { error } = await sb.from('AttendanceV2')
+        .delete()
+        .eq('student_id', id)
+        .eq('date', today)
+        .eq('semester', currentSemester);
+      if (error) throw error;
+      await loadTodayAttendance();
+    }
+    showStatus(`✓ ${nama} dihapus dari data`, "ok");
+  } catch (err) {
+    showStatus("Error: " + err.message, "error");
+  }
+  showLoading(false);
+}
+
 // ===== SERVER-SIDE SEARCH & PREDICTIVE =====
 const lateSearchInput = document.getElementById("lateSearchInput");
 const latePredictive = document.getElementById("latePredictive");
@@ -168,11 +275,7 @@ const runServerSearch = debounce(async (q) => {
 
     if (error) throw error;
 
-    // Client-side exclude: already selected or already TELAT today
-    const matches = (data || []).filter(s =>
-      !helperLateStudents.find(ls => ls.nama === s.nama) &&
-      !todayTelatStudents.find(ts => ts.id === s.id)
-    ).slice(0, 5);
+    const matches = (data || []).slice(0, 5);
 
     if (!matches.length) {
       if (latePredictive) latePredictive.style.display = "none";
@@ -180,12 +283,20 @@ const runServerSearch = debounce(async (q) => {
     }
 
     if (latePredictive) {
-      latePredictive.innerHTML = matches.map(s => `
-        <div class="predictive-item" data-nama="${encodeURIComponent(s.nama)}" data-kelas="${encodeURIComponent(s.kelas || '')}">
+      latePredictive.innerHTML = matches.map(s => {
+        // "sudah didata" = already on the waiting list OR already has any
+        // AttendanceV2 row today (any status) — either would hit the duplicate error.
+        const inWaitingList = helperLateStudents.some(ls => ls.id === s.id);
+        const alreadyRecorded = todayAttendanceIds.has(s.id);
+        const tagged = inWaitingList || alreadyRecorded;
+        return `
+        <div class="predictive-item${tagged ? ' predictive-item-tagged' : ''}" data-id="${s.id}" data-nama="${encodeURIComponent(s.nama)}" data-kelas="${encodeURIComponent(s.kelas || '')}">
           <div class="pred-name">${highlightMatch(escapeHtml(s.nama), q)}</div>
           <div class="pred-class">${escapeHtml(s.kelas || '')}</div>
+          ${tagged ? '<span class="pred-tag">sudah didata</span>' : ''}
         </div>
-      `).join("");
+      `;
+      }).join("");
       latePredictive.style.display = "block";
     }
   } catch (e) {
@@ -211,9 +322,9 @@ function highlightMatch(text, query) {
   return text.substring(0, idx) + '<b>' + text.substring(idx, idx + query.length) + '</b>' + text.substring(idx + query.length);
 }
 
-function addLateStudent(nama, kelas) {
-  if (helperLateStudents.find(s => s.nama === nama)) return;
-  helperLateStudents.push({ nama, kelas });
+function addLateStudent(id, nama, kelas) {
+  if (helperLateStudents.find(s => s.id === id)) return;
+  helperLateStudents.push({ id, nama, kelas });
   if (lateSearchInput) lateSearchInput.value = "";
   if (latePredictive) latePredictive.style.display = "none";
   renderLateSelected();
@@ -279,23 +390,12 @@ async function submitLateRecord() {
 
   try {
     const today = getJakartaDateString();
-    const inserts = [];
-
-    for (const s of helperLateStudents) {
-      const { data: found } = await sb.from('Database')
-        .select('id')
-        .eq('nama', s.nama)
-        .maybeSingle();
-
-      if (found) {
-          inserts.push({
-          student_id: found.id,
-          date: today,
-          semester: currentSemester,
-          status: 'TERLAMBAT'
-        });
-      }
-    }
+    const inserts = helperLateStudents.map(s => ({
+      student_id: s.id,
+      date: today,
+      semester: currentSemester,
+      status: 'TERLAMBAT'
+    }));
 
     if (inserts.length > 0) {
       const { error } = await sb.from('AttendanceV2').insert(inserts);
@@ -305,7 +405,7 @@ async function submitLateRecord() {
     showStatus(`✓ ${inserts.length} siswa dicatat TELAT`, "ok");
     helperLateStudents = [];
     renderLateSelected();
-    loadTelatStudents();
+    loadTodayAttendance();
   } catch (err) {
     showStatus("Error: " + err.message, "error");
   }
