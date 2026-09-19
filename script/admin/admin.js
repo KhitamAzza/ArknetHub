@@ -2197,16 +2197,23 @@ let adminPhotoPointers = new Map();
 let adminPhotoPinchStartDist = 0;
 let adminPhotoPinchStartScale = 1;
 let adminPhotoPanStart = null;
+let adminPhotoRotation = 0; // 0 | 90 | 180 | 270
 
 function adminPhotoApplyTransform() {
   const img = document.getElementById('adminPhotoImg');
-  if (img) img.style.transform = `translate(calc(-50% + ${adminPhotoTx}px), calc(-50% + ${adminPhotoTy}px)) scale(${adminPhotoScale})`;
+  if (img) img.style.transform = `translate(calc(-50% + ${adminPhotoTx}px), calc(-50% + ${adminPhotoTy}px)) rotate(${adminPhotoRotation}deg) scale(${adminPhotoScale})`;
+}
+
+function adminPhotoRotate() {
+  adminPhotoRotation = (adminPhotoRotation + 90) % 360;
+  adminPhotoApplyTransform();
 }
 
 function adminPhotoZoomReset() {
   adminPhotoScale = 1;
   adminPhotoTx = 0;
   adminPhotoTy = 0;
+  adminPhotoRotation = 0;
   adminPhotoApplyTransform();
 }
 
@@ -2507,10 +2514,12 @@ function selectProofEkstra(ekstra) {
     const uploadedAt = proof.uploaded_at
       ? new Date(proof.uploaded_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })
       : '-';
+    const imgId = `proofPhotoImg${i}`;
     return `
     <div class="proof-photo-card" style="${i > 0 ? 'margin-top:16px;' : ''}" onclick="window.open('${escapeHtml(proof.photo_url)}','_blank')">
       <div class="proof-photo-frame">
-        <img src="${escapeHtml(proof.photo_url)}" alt="Bukti absensi lembar ${proof.page || i + 1}" onerror="this.parentElement.innerHTML='<div class=\\'proof-photo-error\\'>Gagal memuat gambar</div>'">
+        <button class="proof-photo-rotate-btn" onclick="rotateProofImage(event, '${imgId}')" title="Putar foto">⟳</button>
+        <img id="${imgId}" data-rotation="0" src="${escapeHtml(proof.photo_url)}" alt="Bukti absensi lembar ${proof.page || i + 1}" onerror="this.parentElement.innerHTML='<div class=\\'proof-photo-error\\'>Gagal memuat gambar</div>'">
       </div>
       <div class="proof-photo-meta">
         <div class="proof-meta-row">
@@ -2535,6 +2544,16 @@ function showProofEkstraList() {
   document.getElementById('proofPhotoView').style.display = 'none';
   document.getElementById('proofEkstraListView').style.display = 'block';
   document.getElementById('proofViewerSubtitle').textContent = proofViewerCurrentDate;
+}
+
+function rotateProofImage(e, imgId) {
+  e.stopPropagation(); // don't trigger the card's "open in new tab" click
+  const img = document.getElementById(imgId);
+  if (!img) return;
+  const deg = (parseInt(img.dataset.rotation || '0', 10) + 90) % 360;
+  img.dataset.rotation = deg;
+  img.style.transform = `rotate(${deg}deg)`;
+  img.parentElement.classList.toggle('proof-photo-frame-rotated', deg === 90 || deg === 270);
 }
 // ===== UTILS =====
 
