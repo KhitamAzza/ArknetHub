@@ -37,7 +37,8 @@ const OPERATORS = {
   "eksdance": { name: "Ocha", ekstra: "Dance" },
   "ekscatur": { name: "Vanny", ekstra: "Catur" },
   "ekscinalam": { name: "Badrian", ekstra: "Pecinta Alam" },
-  "ekspramu": { name: "kakak pembina", ekstra: "Pramuka" }
+  "ekskhusus": { name: "Hernanda", ekstra: "Pembinaan khusus"},
+  "ekspramu": { name: "Kakak pembina", ekstra: "Pramuka"}
 };
 
 const BULAN_ID = [
