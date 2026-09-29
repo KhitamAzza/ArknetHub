@@ -39,7 +39,7 @@ function initFixerMode() {
       }
 
       pred.innerHTML = matches.map(s => `
-        <div class="predictive-item" data-nama="${encodeURIComponent(s.nama)}">
+        <div class="predictive-item" data-id="${escapeHtml(String(s.id))}">
           <div class="pred-name">${highlightMatchFixer(escapeHtml(s.nama), q)}</div>
           <div class="pred-class">${escapeHtml(s.kelas || '')} • ${escapeHtml(s.ekstra || '')}</div>
         </div>
@@ -52,8 +52,7 @@ function initFixerMode() {
     pred.onclick = (e) => {
       const item = e.target.closest(".predictive-item");
       if (!item) return;
-      const nama = decodeURIComponent(item.dataset.nama);
-      selectFixerStudent(nama);
+      selectFixerStudent(item.dataset.id);
       if (input) input.value = "";
       pred.style.display = "none";
     };
@@ -89,13 +88,13 @@ function deriveFixerStatus(rows) {
   if (!rows || rows.length === 0) return 'KOSONG';
   return (rows[0].status || 'KOSONG').trim().toUpperCase();
 }
-async function selectFixerStudent(nama) {
+async function selectFixerStudent(studentId) {
   showLoading(true);
   try {
     const { data: students, error: studentError } = await sb
       .from('Database')
       .select('id, nama, kelas, ekstra, photo_url')
-      .ilike('nama', `%${nama}%`)
+      .eq('id', studentId)
       .limit(1);
     
     if (studentError) throw studentError;
@@ -343,7 +342,7 @@ async function saveFixerEdit() {
     }
 
     showStatus("✓ Absensi diperbarui", "ok");
-    await selectFixerStudent(targetNama); // re-render so the new date appears
+    await selectFixerStudent(targetStudentId); // re-render so the new date appears
   } catch (err) {
     showStatus("Error: " + err.message, "error");
   }
@@ -767,7 +766,7 @@ function initKelolaSiswa() {
       }
 
       pred.innerHTML = matches.map(s => `
-        <div class="predictive-item" data-nama="${encodeURIComponent(s.nama)}">
+        <div class="predictive-item" data-id="${escapeHtml(String(s.id))}">
           <div class="pred-name">${highlightMatchFixer(escapeHtml(s.nama), q)}</div>
           <div class="pred-class">${escapeHtml(s.kelas || '')} • ${escapeHtml(s.ekstra || '-')}</div>
         </div>
@@ -780,8 +779,7 @@ function initKelolaSiswa() {
     pred.onclick = (e) => {
       const item = e.target.closest(".predictive-item");
       if (!item) return;
-      const nama = decodeURIComponent(item.dataset.nama);
-      selectKelolaStudent(nama);
+      selectKelolaStudent(item.dataset.id);
       if (input) input.value = "";
       pred.style.display = "none";
     };
@@ -843,13 +841,13 @@ function switchKelolaTab(tab) {
   }
 }
 
-async function selectKelolaStudent(nama) {
+async function selectKelolaStudent(studentId) {
   showLoading(true);
   try {
     const { data: students, error } = await sb
       .from('Database')
       .select('id, nama, kelas, ekstra, photo_url')
-      .ilike('nama', `%${nama}%`)
+      .eq('id', studentId)
       .limit(1);
 
     if (error) throw error;
