@@ -84,28 +84,47 @@ async function initTatibPayment() {
   showLoading(false);
 }
 
+/* ===== PAGINATED FETCH =====
+   Supabase caps every select at 1000 rows by default. Without paging,
+   rows past the cap silently vanish (students missing from the list,
+   violations undercounted so the debt looks like 0). */
+async function tatibFetchAll(buildQuery) {
+  const PAGE = 1000;
+  let all = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await buildQuery().range(from, from + PAGE - 1);
+    if (error) return { data: null, error };
+    all = all.concat(data || []);
+    if (!data || data.length < PAGE) break;
+  }
+  return { data: all, error: null };
+}
+
 /* ===== DEBT CALCULATION (Supabase) ===== */
 async function fetchTatibDebtData() {
   const config = await loadSupabaseConfig();
   const dendaAlpha = config.dendaAlpha || 0;
   const dendaTerlambat = config.dendaTerlambat || 0;
 
-  const { data: students, error: sErr } = await sb
+  const { data: students, error: sErr } = await tatibFetchAll(() => sb
     .from('Database')
-    .select('id, nama, kelas, ekstra, photo_url');
+    .select('id, nama, kelas, ekstra, photo_url')
+    .order('id', { ascending: true }));
   if (sErr) throw new Error("Gagal memuat database: " + sErr.message);
 
-    const { data: violations, error: vErr } = await sb
+  const { data: violations, error: vErr } = await tatibFetchAll(() => sb
     .from('AttendanceV2')  // was Attendance
     .select('student_id, status')
     .eq('semester', currentSemester)
-    .in('status', ['ALPHA', 'TERLAMBAT', 'TELAT']);
+    .in('status', ['ALPHA', 'TERLAMBAT', 'TELAT'])
+    .order('id', { ascending: true }));
   if (vErr) throw new Error("Gagal memuat pelanggaran: " + vErr.message);
 
-  const { data: payments, error: pErr } = await sb
+  const { data: payments, error: pErr } = await tatibFetchAll(() => sb
     .from('bayardenda')
     .select('student_id, amount')
-    .eq('semester', currentSemester);
+    .eq('semester', currentSemester)
+    .order('id', { ascending: true }));
   if (pErr) throw new Error("Gagal memuat pembayaran: " + pErr.message);
 
   const violationCounts = {};
