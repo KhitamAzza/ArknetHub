@@ -101,7 +101,7 @@ function hideAllScreens() {
     "absenMenuScreen", "registrationScreen", "summaryModal",
     "adminScreen", "helperScreen", "overseerScreen",
     "fixerScreen", "configScreen", "lateRecordScreen",
-    "faceScanScreen", "danaHistoryScreen", "syaratScreen",
+    "faceScanScreen", "danaHistoryScreen", "syaratScreen", "nilaiScreen",
     "daftarScreen", "searchOverlay", "ketuaScreen",
     "tatibScreen", "tatibPaymentScreen", "tatibHeatmapScreen",
     "tatibBermasalahScreen", "kelolaSiswaScreen", "tanpaEkstraModal",
@@ -378,6 +378,7 @@ function clearBundle() {
 function showDashboard() {
   hideAllScreens();
   if (dashboardScreen) dashboardScreen.style.display = "flex";
+  if (typeof applyNilaiMenuVisibility === 'function') applyNilaiMenuVisibility();
 }
 
 function showAdminScreen() {
@@ -640,6 +641,7 @@ async function loadSupabaseConfig() {
         nilaiMinusTerlambat: data.nilai_minus_terlambat,
         maxPointSubmit: data.max_point_submit,
         maxRedemptionPoint: data.max_redemption_point,
+        nilaiEnable: data.nilai_enable !== false,
         currentSemester: currentSemester
     };
     
@@ -667,6 +669,7 @@ function getDefaultConfig() {
         nilaiMinusTerlambat: -5,
         maxPointSubmit: 1,
         maxRedemptionPoint: 5,
+        nilaiEnable: true,
         currentSemester: 'STS (Ganjil)'
     };
 }

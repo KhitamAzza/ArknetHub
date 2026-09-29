@@ -60,6 +60,10 @@
       <div class="dash-icon">✨</div>
       <div class="dash-label">Syarat Khusus</div>
     </div>
+    <div class="dash-btn" id="nilaiDashBtn" onclick="showNilai()">
+      <div class="dash-icon">📝</div>
+      <div class="dash-label">Nilai Ekskul</div>
+    </div>
     <div class="dash-btn" onclick="openDanaModal()">
       <div class="dash-icon">💰</div>
       <div class="dash-label">Pengajuan Dana</div>
@@ -1023,6 +1027,44 @@
     <button class="btn-send-compact" id="syaratSaveBtn" onclick="submitSyaratChanges()" disabled>Simpan</button>
   </div>
 </div>
+<!-- ===== NILAI EKSKUL SCREEN ===== -->
+<div id="nilaiScreen" style="display:none;">
+  <div class="reg-header">
+    <button class="icon-btn" onclick="backToDashboardFromNilai()">◀</button>
+    <div class="reg-title">Nilai Ekskul</div>
+  </div>
+
+  <div class="tatib-search-wrap">
+    <input type="text" id="nilaiSearchInput" class="tatib-search-input" placeholder="Cari nama siswa..." oninput="handleNilaiSearch()" autocomplete="off">
+  </div>
+
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-label">TOTAL</div>
+      <div class="stat-value" id="nilaiStatTotal">0</div>
+    </div>
+    <div class="stat-card stat-green">
+      <div class="stat-label">RATA-RATA</div>
+      <div class="stat-value" id="nilaiStatAvg">0</div>
+    </div>
+    <div class="stat-card stat-red">
+      <div class="stat-label">NILAI 0</div>
+      <div class="stat-value" id="nilaiStatZero">0</div>
+    </div>
+  </div>
+
+  <div class="syarat-list-container" id="nilaiList"></div>
+
+  <div class="empty-state" id="nilaiEmpty" style="display:none;">
+    <div class="empty-state-icon">📭</div>
+    <div class="empty-state-text" id="nilaiEmptyText">Tidak ada siswa</div>
+  </div>
+
+  <div class="syarat-bottom-bar">
+    <div class="syarat-change-count" id="nilaiChangeCount">0 perubahan</div>
+    <button class="btn-send-compact" id="nilaiSaveBtn" onclick="submitNilaiChanges()" disabled>Simpan</button>
+  </div>
+</div>
 <!-- PENGajuan DANA MODAL -->
 <div id="danaModal" class="modal-overlay">
   <div class="modal-sheet">
@@ -1415,6 +1457,7 @@
 <script src="script/pembina/paper.js"></script>
 <script src="script/pembina/daftar.js"></script>
 <script src="script/pembina/syarat.js"></script>
+<script src="script/pembina/nilai.js"></script>
 <script src="script/pembina/dana.js"></script>
 <script src="script/pembina/helper.js"></script>
 <script src="script/admin/admin.js"></script>

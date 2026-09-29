@@ -1993,3 +1993,47 @@ paperCameraSection {
   cursor: pointer;
   padding: 4px;
 }
+/* ===== NILAI EKSKUL ===== */
+#nilaiScreen {
+  display: none;
+  flex-direction: column;
+  height: 100dvh;
+}
+
+.nilai-input {
+  width: 72px;
+  padding: 10px 8px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  outline: none;
+  flex-shrink: 0;
+}
+
+.nilai-input:focus {
+  border-color: var(--accent);
+}
+
+.syarat-item.nilai-changed {
+  border-color: var(--yellow);
+}
+
+.syarat-item.nilai-changed .nilai-input {
+  border-color: var(--yellow);
+}
+
+#nilaiSaveBtn.has-changes {
+  background: linear-gradient(135deg, var(--green), #059669);
+  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+}
+
+#nilaiSaveBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: var(--border);
+  box-shadow: none;
+}

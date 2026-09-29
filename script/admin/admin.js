@@ -384,7 +384,8 @@ const CONFIG_DB_MAP = {
   maxRedemptionPoint: 'max_redemption_point',
   currentSemester: 'current_semester',
   omrRequireCorners: 'omr_require_corners',
-  uploadBackend: 'upload_backend'
+  uploadBackend: 'upload_backend',
+  nilaiEnable: 'nilai_enable'
 };
 
 function initConfigMenu() {
@@ -423,7 +424,8 @@ async function loadConfigValues() {
   maxRedemptionPoint: data.max_redemption_point,
   currentSemester: data.current_semester || 'STS (Ganjil)',
   uploadBackend: data.upload_backend || 'cloudinary',
-  omrRequireCorners: data.omr_require_corners
+  omrRequireCorners: data.omr_require_corners,
+  nilaiEnable: data.nilai_enable !== false
 };
 
     const { data: ketuaData, error: ketuaErr } = await sb
@@ -486,6 +488,12 @@ function renderConfigMenu() {
       items: [
         { key: "helperEnable", label: "Siswa bisa mengabsen", type: "toggle" },
         { key: "helperPassword", label: "Password siswa", type: "text" }
+      ]
+    },
+    {
+      title: "Menu pembina",
+      items: [
+        { key: "nilaiEnable", label: "Aktifkan menu Nilai Ekskul", type: "toggle" }
       ]
     },
     {

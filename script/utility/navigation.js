@@ -10,7 +10,7 @@
     'lateRecordScreen', 'danaHistoryScreen', 'syaratScreen', 'daftarScreen',
     'ketuaScreen', 'tatibScreen', 'tatibPaymentScreen', 'tatibHeatmapScreen',
     'tatibBermasalahScreen', 'kelolaSiswaScreen', 'paperScreen', 'adminInputScreen',
-    'proofViewerScreen', 'kelolaAbsensiScreen', 'printAbsensiScreen'
+    'proofViewerScreen', 'kelolaAbsensiScreen', 'printAbsensiScreen', 'nilaiScreen'
   ];
 
   // Modals/overlays (toggled via 'visible' class, or display on overlay)
