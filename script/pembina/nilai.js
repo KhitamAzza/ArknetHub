@@ -96,6 +96,13 @@ function clampNilai(v) {
   return Math.max(0, Math.min(100, n));
 }
 
+function nilaiLevel(v) {
+  if (v <= 0) return "zero";
+  if (v < 60) return "low";
+  if (v < 80) return "mid";
+  return "high";
+}
+
 function currentNilai(s) {
   return nilaiChanges.has(s.id) ? nilaiChanges.get(s.id) : s.nilai;
 }
@@ -167,20 +174,26 @@ function renderNilaiList() {
           <div class="syarat-class">${escapeHtml(s.kelas || "")}</div>
         </div>
       </div>
-      <input class="nilai-input" type="text" inputmode="numeric" pattern="[0-9]*"
-             maxlength="3" value="${currentNilai(s)}" aria-label="Nilai ${escapeHtml(s.nama)}">
+      <div class="nilai-field" data-level="${nilaiLevel(currentNilai(s))}">
+        <input class="nilai-score" type="text" inputmode="numeric" pattern="[0-9]*"
+               maxlength="3" value="${currentNilai(s)}" aria-label="Nilai ${escapeHtml(s.nama)}">
+        <span class="nilai-suffix">/100</span>
+      </div>
     `;
 
-    const input = item.querySelector(".nilai-input");
+    const input = item.querySelector(".nilai-score");
+    const field = item.querySelector(".nilai-field");
     input.addEventListener("focus", () => input.select());
     input.addEventListener("input", () => {
       const digits = input.value.replace(/\D/g, "");
       const val = digits === "" ? 0 : clampNilai(digits);
       if (digits !== "") input.value = val; // keeps value inside 0-100 while typing
+      field.dataset.level = nilaiLevel(val);
       setNilai(s.id, val, item);
     });
     input.addEventListener("blur", () => {
       input.value = currentNilai(s); // empty -> shows 0
+      field.dataset.level = nilaiLevel(currentNilai(s));
     });
 
     nilaiList.appendChild(item);

@@ -457,6 +457,12 @@ function renderConfigMenu() {
     ]
   },
   {
+    title: "Menu pembina",
+    items: [
+      { key: "nilaiEnable", label: "Aktifkan menu Nilai Ekskul", type: "toggle" }
+    ]
+  },
+  {
     title: "Jendela Upload Bukti Absensi (Pembina)",
     items: [
       { key: "mulaiPengumpulan", label: "Mulai Pengumpulan", type: "time" },
@@ -488,12 +494,6 @@ function renderConfigMenu() {
       items: [
         { key: "helperEnable", label: "Siswa bisa mengabsen", type: "toggle" },
         { key: "helperPassword", label: "Password siswa", type: "text" }
-      ]
-    },
-    {
-      title: "Menu pembina",
-      items: [
-        { key: "nilaiEnable", label: "Aktifkan menu Nilai Ekskul", type: "toggle" }
       ]
     },
     {
