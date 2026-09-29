@@ -18,7 +18,7 @@
     'summaryModal', 'tatibPaymentModal', 'fixerEditModal', 'danaModal',
     'waReportModal', 'overseerDateModal', 'waPreviewModal', 'removeModal',
     'tanpaEkstraModal', 'expelModal', 'backBlockModal', 'adminInputPickerModal',
-    'adminProofDateModal', 'lateConfirmModal', 'searchOverlay'
+    'adminProofDateModal', 'lateConfirmModal', 'searchOverlay', 'nilaiPurgeModal'
   ];
 
   // "Home" level per role — back here asks for confirmation instead of

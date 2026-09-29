@@ -459,7 +459,8 @@ function renderConfigMenu() {
   {
     title: "Menu pembina",
     items: [
-      { key: "nilaiEnable", label: "Aktifkan menu Nilai Ekskul", type: "toggle" }
+      { key: "nilaiEnable", label: "Aktifkan menu Nilai Ekskul", type: "toggle" },
+      { type: "danger", label: "Reset semua nilai ekskul", desc: "Mengembalikan nilai seluruh siswa ke 0. Tidak bisa dibatalkan.", btn: "Reset", action: "openNilaiPurge()" }
     ]
   },
   {
@@ -519,6 +520,18 @@ function renderConfigMenu() {
 }
 function renderConfigItem(item) {
   const val = configChanges[item.key] !== undefined ? configChanges[item.key] : configCache[item.key];
+
+  if (item.type === "danger") {
+    return `
+      <div class="config-item config-danger-item">
+        <div class="config-danger-text">
+          <div class="config-label" style="margin-bottom:4px;">${item.label}</div>
+          <div class="config-danger-desc">${item.desc || ""}</div>
+        </div>
+        <button class="config-danger-btn" onclick="${item.action}">${item.btn || "Jalankan"}</button>
+      </div>
+    `;
+  }
 
   if (item.type === "slider") {
     return `
@@ -2908,4 +2921,70 @@ function escapeHtml(text) {
   const div = document.createElement("div");
   div.textContent = text || "";
   return div.innerHTML;
+}
+
+// ===== PURGE NILAI EKSKUL =====
+const NILAI_PURGE_WORD = "RESET";
+
+async function openNilaiPurge() {
+  showLoading(true);
+  let count = 0;
+  try {
+    const { count: c, error } = await sb
+      .from('Database')
+      .select('id', { count: 'exact', head: true })
+      .gt('nilai_ekskul', 0);
+    if (error) throw error;
+    count = c || 0;
+  } catch (err) {
+    showLoading(false);
+    showStatus("Error: " + err.message, "error");
+    return;
+  }
+  showLoading(false);
+
+  if (count === 0) {
+    showStatus("Tidak ada nilai yang perlu direset", "info");
+    return;
+  }
+
+  document.getElementById("nilaiPurgeCount").textContent =
+    `${count} siswa memiliki nilai di atas 0`;
+  document.getElementById("nilaiPurgeInput").value = "";
+  document.getElementById("nilaiPurgeConfirmBtn").disabled = true;
+  document.getElementById("nilaiPurgeModal").classList.add("visible");
+}
+
+function closeNilaiPurgeModal() {
+  document.getElementById("nilaiPurgeModal").classList.remove("visible");
+}
+
+function onNilaiPurgeInput() {
+  const v = document.getElementById("nilaiPurgeInput").value.trim().toUpperCase();
+  document.getElementById("nilaiPurgeConfirmBtn").disabled = (v !== NILAI_PURGE_WORD);
+}
+
+async function confirmNilaiPurge() {
+  const v = document.getElementById("nilaiPurgeInput").value.trim().toUpperCase();
+  if (v !== NILAI_PURGE_WORD) return;
+
+  const btn = document.getElementById("nilaiPurgeConfirmBtn");
+  btn.disabled = true;
+  showLoading(true);
+  try {
+    // .gt() satisfies Supabase's "update needs a filter" rule and skips rows already at 0
+    const { error, count } = await sb
+      .from('Database')
+      .update({ nilai_ekskul: 0 }, { count: 'exact' })
+      .gt('nilai_ekskul', 0);
+    if (error) throw error;
+
+    if (typeof clearBundle === 'function') clearBundle();
+    closeNilaiPurgeModal();
+    showStatus(`✓ ${count ?? 0} nilai direset ke 0`, "ok");
+  } catch (err) {
+    showStatus("Error: " + err.message, "error");
+    btn.disabled = false;
+  }
+  showLoading(false);
 }

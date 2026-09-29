@@ -1451,6 +1451,34 @@
   </div>
 </div>
 
+<!-- NILAI PURGE CONFIRM MODAL -->
+<div id="nilaiPurgeModal" class="modal-overlay">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title">Reset Semua Nilai</div>
+      <button class="icon-btn" onclick="closeNilaiPurgeModal()">✕</button>
+    </div>
+    <div class="modal-body" style="text-align:center;padding:32px 20px;">
+      <div style="font-size:48px;margin-bottom:16px;">⚠️</div>
+      <div style="font-size:16px;font-weight:700;margin-bottom:8px;" id="nilaiPurgeCount">-</div>
+      <div style="font-size:13px;color:var(--red);font-weight:600;margin-bottom:8px;">
+        Nilai SEMUA siswa di SEMUA ekskul akan dikembalikan ke 0.
+      </div>
+      <div style="font-size:13px;color:var(--text-secondary);margin-bottom:24px;">
+        Tindakan ini tidak dapat dibatalkan.
+      </div>
+      <div class="form-group" style="text-align:left;">
+        <label class="form-label">Ketik RESET untuk mengonfirmasi</label>
+        <input type="text" id="nilaiPurgeInput" class="form-input" placeholder="RESET" autocomplete="off" autocapitalize="characters" oninput="onNilaiPurgeInput()">
+      </div>
+    </div>
+    <div class="modal-footer" style="flex-direction:column;gap:8px;">
+      <button class="btn-primary" style="width:100%;background:var(--red);" id="nilaiPurgeConfirmBtn" onclick="confirmNilaiPurge()" disabled>Reset Semua Nilai</button>
+      <button class="btn-secondary" style="width:100%;background:transparent;" onclick="closeNilaiPurgeModal()">Batal</button>
+    </div>
+  </div>
+</div>
+
 <!-- SCRIPTS -->
 <script src="script/utility/main.js"></script>
 <script src="script/utility/utils.js"></script>

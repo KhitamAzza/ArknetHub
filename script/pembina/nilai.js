@@ -1,4 +1,6 @@
 // ===== NILAI EKSKUL (pembina) =====
+const NILAI_ADVANCE_DELAY = 900; // ms idle before auto-advancing an ambiguous entry (1-9, 10)
+let nilaiAdvanceTimer = null;
 let nilaiStudents = [];
 let nilaiChanges = new Map(); // id -> number (0-100), only rows that differ from DB
 let nilaiSearchQuery = "";
@@ -96,6 +98,27 @@ function clampNilai(v) {
   return Math.max(0, Math.min(100, n));
 }
 
+// True when no further digit can make a valid 0-100 score:
+//  - 3 digits (100, or "0xx" shorthand)
+//  - 2 digits except "10" (which may become 100). "05" = 5 is a valid shorthand.
+function nilaiIsComplete(digits) {
+  if (digits.length >= 3) return true;
+  if (digits.length === 2) return digits !== "10";
+  return false;
+}
+
+function nilaiFocusNext(input) {
+  clearTimeout(nilaiAdvanceTimer);
+  const inputs = Array.from(nilaiList.querySelectorAll(".nilai-score"));
+  const next = inputs[inputs.indexOf(input) + 1];
+  if (next) {
+    next.focus();
+    next.scrollIntoView({ block: "center", behavior: "smooth" });
+  } else {
+    input.blur(); // last student: close the keyboard
+  }
+}
+
 function nilaiLevel(v) {
   if (v <= 0) return "zero";
   if (v < 60) return "low";
@@ -176,7 +199,7 @@ function renderNilaiList() {
       </div>
       <div class="nilai-field" data-level="${nilaiLevel(currentNilai(s))}">
         <input class="nilai-score" type="text" inputmode="numeric" pattern="[0-9]*"
-               maxlength="3" value="${currentNilai(s)}" aria-label="Nilai ${escapeHtml(s.nama)}">
+               maxlength="3" enterkeyhint="next" value="${currentNilai(s)}" aria-label="Nilai ${escapeHtml(s.nama)}">
         <span class="nilai-suffix">/100</span>
       </div>
     `;
@@ -185,13 +208,29 @@ function renderNilaiList() {
     const field = item.querySelector(".nilai-field");
     input.addEventListener("focus", () => input.select());
     input.addEventListener("input", () => {
+      clearTimeout(nilaiAdvanceTimer);
       const digits = input.value.replace(/\D/g, "");
       const val = digits === "" ? 0 : clampNilai(digits);
       if (digits !== "") input.value = val; // keeps value inside 0-100 while typing
       field.dataset.level = nilaiLevel(val);
       setNilai(s.id, val, item);
+
+      if (digits === "") return;
+      if (nilaiIsComplete(digits)) {
+        nilaiFocusNext(input);
+      } else {
+        // could still grow (e.g. "8" -> "85", "10" -> "100"): advance after a short pause
+        nilaiAdvanceTimer = setTimeout(() => nilaiFocusNext(input), NILAI_ADVANCE_DELAY);
+      }
+    });
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        nilaiFocusNext(input);
+      }
     });
     input.addEventListener("blur", () => {
+      clearTimeout(nilaiAdvanceTimer);
       input.value = currentNilai(s); // empty -> shows 0
       field.dataset.level = nilaiLevel(currentNilai(s));
     });
