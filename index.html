@@ -353,6 +353,9 @@
     <input type="text" id="dendaDiterimaSearchInput" class="tatib-search-input" placeholder="Cari nama atau kelas..." oninput="filterDendaDiterimaList()" autocomplete="off">
   </div>
 
+  <div class="denda-filter-chips" id="dendaSubmitterChips" style="display:none;"></div>
+  <div class="denda-daily-summary" id="dendaDailySummary" style="display:none;"></div>
+
   <div class="tatib-debt-list-container" id="dendaDiterimaListContainer"></div>
 
   <div class="empty-state" id="dendaDiterimaEmpty" style="display:none;">
@@ -617,17 +620,14 @@
       <button class="overseer-wa-report-btn" onclick="openWaReportModal()">📤 Kirim Laporan WA</button>
     </div>
 
-        <!-- Section 2: Siswa Bermasalah -->
+        <!-- Section 2: Syarat Khusus Tracker -->
 <div class="overseer-card">
   <div class="overseer-card-header">
-    <div class="overseer-card-title">🚨 Siswa Bermasalah</div>
-    <button class="overseer-card-toggle" id="alphaCardToggle" onclick="toggleAlphaCard()" title="Perkecil/Perbesar">📁</button>
+    <div class="overseer-card-title">📋 Syarat Khusus</div>
   </div>
-  <div class="overseer-alpha-list" id="overseerAlphaList">
+  <div class="overseer-syarat-summary" id="overseerSyaratSummary"></div>
+  <div class="overseer-alpha-list" id="overseerSyaratList">
     <div class="overseer-empty">Memuat...</div>
-  </div>
-  <div class="overseer-alpha-footer" style="display:none;">
-    <button class="overseer-wa-all-btn" onclick="sendAllWakelWa()">📤 Kirim WA ke Seluruh Wakel</button>
   </div>
 </div>
 

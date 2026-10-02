@@ -295,8 +295,53 @@ async function submitAdminDendaPayment() {
    on insert, only tatib-submitted, not-yet-handed-over payments
    ever appear here — no separate role check needed.
    =================================================== */
-let dendaDiterimaList = [];       // grouped by student: { studentId, nama, kelas, ekstra, total, rowIds, submitters }
+let dendaDiterimaRows = [];       // flat rows: { id, studentId, nama, kelas, ekstra, amount, submitter, dayKey }
+let dendaSubmitterFilter = '';    // '' = semua submitter
 let dendaSelectedIds = new Set(); // selected studentIds
+
+function dendaDayKey(createdAt) {
+  return createdAt
+    ? new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date(createdAt))
+    : 'unknown';
+}
+
+function dendaDayLabel(dayKey) {
+  if (dayKey === 'unknown') return 'Tanggal tidak diketahui';
+  return new Intl.DateTimeFormat('id-ID', {
+    weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Jakarta'
+  }).format(new Date(dayKey + 'T00:00:00+07:00'));
+}
+
+// Rows after the submitter filter (search is applied later, only to the list).
+function getDendaFilteredRows() {
+  return dendaSubmitterFilter
+    ? dendaDiterimaRows.filter(r => r.submitter === dendaSubmitterFilter)
+    : dendaDiterimaRows;
+}
+
+// Groups rows by student. Totals and rowIds only include rows that pass the
+// submitter filter, so confirming under a filter never touches hidden rows.
+function getDendaVisibleGroups() {
+  const grouped = new Map();
+  getDendaFilteredRows().forEach(r => {
+    if (!grouped.has(r.studentId)) {
+      grouped.set(r.studentId, {
+        studentId: r.studentId,
+        nama: r.nama,
+        kelas: r.kelas,
+        ekstra: r.ekstra,
+        total: 0,
+        rowIds: [],
+        submitters: new Set()
+      });
+    }
+    const g = grouped.get(r.studentId);
+    g.total += r.amount;
+    g.rowIds.push(r.id);
+    if (r.submitter) g.submitters.add(r.submitter);
+  });
+  return Array.from(grouped.values());
+}
 
 function showDendaDiterima() {
   hideAllScreens();
@@ -305,6 +350,7 @@ function showDendaDiterima() {
     el.style.display = 'flex';
     const search = document.getElementById('dendaDiterimaSearchInput');
     if (search) search.value = '';
+    dendaSubmitterFilter = '';
     dendaSelectedIds.clear();
     loadDendaDiterimaList();
   }
@@ -325,31 +371,30 @@ async function loadDendaDiterimaList() {
       .order('created_at', { ascending: true });
     if (error) throw error;
 
-    const grouped = {};
-    (data || []).forEach(row => {
-      const sid = row.student_id;
-      if (!grouped[sid]) {
-        grouped[sid] = {
-          studentId: sid,
-          nama: row.Database?.nama || '(tidak diketahui)',
-          kelas: row.Database?.kelas || '-',
-          ekstra: row.Database?.ekstra || '-',
-          total: 0,
-          rowIds: [],
-          submitters: new Set()
-        };
-      }
-      grouped[sid].total += row.amount || 0;
-      grouped[sid].rowIds.push(row.id);
-      if (row.submitter) grouped[sid].submitters.add(row.submitter);
-    });
+    dendaDiterimaRows = (data || []).map(row => ({
+      id: row.id,
+      studentId: row.student_id,
+      nama: row.Database?.nama || '(tidak diketahui)',
+      kelas: row.Database?.kelas || '-',
+      ekstra: row.Database?.ekstra || '-',
+      amount: row.amount || 0,
+      submitter: row.submitter || '(tanpa nama)',
+      dayKey: dendaDayKey(row.created_at)
+    }));
 
-    dendaDiterimaList = Object.values(grouped);
+    // Active filter no longer has any pending rows (all confirmed) → back to "Semua"
+    if (dendaSubmitterFilter && !dendaDiterimaRows.some(r => r.submitter === dendaSubmitterFilter)) {
+      dendaSubmitterFilter = '';
+    }
+
     // Drop selections for students that no longer appear (already confirmed elsewhere)
+    const visibleIds = new Set(getDendaVisibleGroups().map(g => g.studentId));
     dendaSelectedIds.forEach(sid => {
-      if (!grouped[sid]) dendaSelectedIds.delete(sid);
+      if (!visibleIds.has(sid)) dendaSelectedIds.delete(sid);
     });
 
+    renderDendaSubmitterChips();
+    renderDendaDailySummary();
     renderDendaDiterimaList(document.getElementById('dendaDiterimaSearchInput')?.value || '');
     updateDendaContextNotif();
   } catch (err) {
@@ -362,13 +407,103 @@ function filterDendaDiterimaList() {
   renderDendaDiterimaList(document.getElementById('dendaDiterimaSearchInput')?.value || '');
 }
 
+/* ----- Submitter filter chips ----- */
+function renderDendaSubmitterChips() {
+  const wrap = document.getElementById('dendaSubmitterChips');
+  if (!wrap) return;
+
+  const totals = {};
+  dendaDiterimaRows.forEach(r => { totals[r.submitter] = (totals[r.submitter] || 0) + r.amount; });
+  const names = Object.keys(totals).sort((a, b) => a.localeCompare(b));
+
+  if (names.length <= 1) { // nothing to filter between
+    wrap.style.display = 'none';
+    wrap.innerHTML = '';
+    return;
+  }
+  wrap.style.display = 'flex';
+
+  const grand = dendaDiterimaRows.reduce((s, r) => s + r.amount, 0);
+  const chip = (label, amount, value) => `
+    <button class="denda-chip ${dendaSubmitterFilter === value ? 'active' : ''}"
+            onclick="setDendaSubmitterFilter('${encodeURIComponent(value)}')">
+      <span class="denda-chip-name">${escapeHtml(label)}</span>
+      <span class="denda-chip-amount">${formatRupiah(amount)}</span>
+    </button>`;
+
+  wrap.innerHTML = chip('Semua', grand, '') + names.map(n => chip(n, totals[n], n)).join('');
+}
+
+function setDendaSubmitterFilter(encodedName) {
+  const name = decodeURIComponent(encodedName);
+  // Tap the active chip again → back to "Semua"
+  dendaSubmitterFilter = (name === dendaSubmitterFilter) ? '' : name;
+  // Selection is cleared on filter change so Simpan can never confirm rows
+  // the admin can't currently see.
+  dendaSelectedIds.clear();
+  renderDendaSubmitterChips();
+  renderDendaDailySummary();
+  renderDendaDiterimaList(document.getElementById('dendaDiterimaSearchInput')?.value || '');
+  updateDendaContextNotif();
+}
+
+/* ----- Daily fund summary (money still held, per day) ----- */
+function renderDendaDailySummary() {
+  const el = document.getElementById('dendaDailySummary');
+  if (!el) return;
+
+  const rows = getDendaFilteredRows();
+  if (rows.length === 0) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.style.display = 'block';
+
+  const days = {};
+  rows.forEach(r => {
+    if (!days[r.dayKey]) days[r.dayKey] = { total: 0, count: 0, bySubmitter: {} };
+    const d = days[r.dayKey];
+    d.total += r.amount;
+    d.count += 1;
+    d.bySubmitter[r.submitter] = (d.bySubmitter[r.submitter] || 0) + r.amount;
+  });
+
+  const grand = rows.reduce((s, r) => s + r.amount, 0);
+  const showBreakdown = !dendaSubmitterFilter;
+
+  const dayRows = Object.keys(days).sort((a, b) => b.localeCompare(a)).map(k => {
+    const d = days[k];
+    const breakdown = showBreakdown
+      ? Object.keys(d.bySubmitter).sort((a, b) => a.localeCompare(b)).map(n => `
+          <div class="denda-daily-sub">
+            <span>${escapeHtml(n)}</span><span>${formatRupiah(d.bySubmitter[n])}</span>
+          </div>`).join('')
+      : '';
+    return `
+      <div class="denda-daily-row">
+        <div class="denda-daily-main">
+          <span class="denda-daily-label">${escapeHtml(dendaDayLabel(k))} <small>• ${d.count} setoran</small></span>
+          <span class="denda-daily-total">${formatRupiah(d.total)}</span>
+        </div>
+        ${breakdown}
+      </div>`;
+  }).join('');
+
+  const title = dendaSubmitterFilter ? `Dana ${escapeHtml(dendaSubmitterFilter)} per hari` : 'Dana per hari';
+  el.innerHTML = `
+    <details class="denda-daily-details">
+      <summary>
+        <span>💰 ${title}</span>
+        <span class="denda-daily-grand">${formatRupiah(grand)}</span>
+      </summary>
+      ${dayRows}
+    </details>`;
+}
+
 function renderDendaDiterimaList(filterQuery = '') {
   const container = document.getElementById('dendaDiterimaListContainer');
   const empty = document.getElementById('dendaDiterimaEmpty');
   if (!container || !empty) return;
 
   const q = filterQuery.trim().toLowerCase();
-  const items = dendaDiterimaList.filter(g =>
+  const items = getDendaVisibleGroups().filter(g =>
     !q || g.nama.toLowerCase().includes(q) || (g.kelas || '').toLowerCase().includes(q)
   );
 
@@ -411,7 +546,7 @@ function updateDendaContextNotif() {
   const countEl = document.getElementById('dendaDiterimaCount');
   const btn = document.getElementById('dendaDiterimaSubmitBtn');
 
-  const selectedGroups = dendaDiterimaList.filter(g => dendaSelectedIds.has(g.studentId));
+  const selectedGroups = getDendaVisibleGroups().filter(g => dendaSelectedIds.has(g.studentId));
   const total = selectedGroups.reduce((sum, g) => sum + g.total, 0);
 
   if (selectedGroups.length === 0) {
@@ -432,7 +567,8 @@ function updateDendaContextNotif() {
 async function submitDendaDiterima() {
   if (dendaSelectedIds.size === 0) return;
 
-  const selectedGroups = dendaDiterimaList.filter(g => dendaSelectedIds.has(g.studentId));
+  // Built from the filtered view → rowIds only include the active submitter's rows
+  const selectedGroups = getDendaVisibleGroups().filter(g => dendaSelectedIds.has(g.studentId));
   const allRowIds = selectedGroups.flatMap(g => g.rowIds);
   const totalAmount = selectedGroups.reduce((sum, g) => sum + g.total, 0);
   const count = selectedGroups.length;

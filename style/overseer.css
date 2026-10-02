@@ -432,3 +432,36 @@
   margin-top: 10px;
   font-weight: 600;
 }
+/* ===== SYARAT KHUSUS TRACKER (reuses .overseer-alpha-* row styles) ===== */
+.overseer-syarat-summary {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: -10px 0 12px;
+}
+
+.overseer-syarat-summary:empty {
+  display: none;
+}
+
+.overseer-alpha-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.overseer-pembina-edit {
+  width: 100%;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.overseer-pembina-edit:active {
+  background: var(--border);
+}

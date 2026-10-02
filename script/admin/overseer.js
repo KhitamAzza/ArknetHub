@@ -2,10 +2,9 @@
 let overseerDates = [];
 let overseerSelectedDate = null;
 let overseerStats = {};
-let overseerAlphaData = [];
-let overseerWakelMap = {};
-let overseerExpandedClass = null;
-let overseerAlphaCardExpanded = false;
+let overseerSyaratData = [];      // [{ ekstra, complete, siswa: [{id,nama,kelas,status}] }] — incomplete only
+let overseerPembinaMap = {};       // ekstra -> whatsapp number
+let overseerSyaratExpanded = null; // ekstra name currently expanded
 
 const BULAN_PARSE = {
   "Januari": 0, "Februari": 1, "Maret": 2, "April": 3, "Mei": 4, "Juni": 5,
@@ -46,16 +45,12 @@ async function fetchAllRows(queryBuilderFn, pageSize = 1000) {
 async function initOverseer() {
   overseerSelectedDate = null;
   overseerStats = {};
-  overseerAlphaData = [];
-  overseerWakelMap = {};
-  overseerExpandedClass = null;
+  overseerSyaratData = [];
+  overseerPembinaMap = {};
+  overseerSyaratExpanded = null;
   await loadOverseerDates();
-  await loadOverseerAlpha();
+  await loadOverseerSyarat();
   await loadOverseerEkstra();
-}
-function toggleAlphaCard() {
-  overseerAlphaCardExpanded = !overseerAlphaCardExpanded;
-  renderOverseerAlpha();
 }
 
 async function loadOverseerDates() {
@@ -234,156 +229,104 @@ async function selectOverseerDate(date) {
   await loadOverseerStats(date);
 }
 
-// ===== SECTION 2: SISWA BERMASALAH =====
-async function loadOverseerAlpha() {
-  const container = document.getElementById('overseerAlphaList');
+// ===== SECTION 2: SYARAT KHUSUS TRACKER =====
+// Per-ekskul tracker of Database.syarat_khusus. "SUDAH" = complete; anything
+// else (BELUM / empty / null) = incomplete. Only ekskul with at least one
+// incomplete student are listed; complete students are never shown by name.
+async function loadOverseerSyarat() {
+  const container = document.getElementById('overseerSyaratList');
   if (container) container.innerHTML = '<div class="overseer-empty">Memuat...</div>';
 
   try {
-    // Paginated: a full semester of ALPHA rows can exceed 1000 easily.
-    const alphaRows = await fetchAllRows((from, to) =>
-      sb
-        .from('AttendanceV2')
-        .select('student_id')
-        .eq('semester', currentSemester)
-        .eq('status', 'ALPHA')
-        .range(from, to)
+    const rows = await fetchAllRows((from, to) =>
+      sb.from('Database').select('id, nama, kelas, ekstra, syarat_khusus').range(from, to)
     );
 
-    const studentAlphaCounts = {};
-    (alphaRows || []).forEach(r => {
-      studentAlphaCounts[r.student_id] = (studentAlphaCounts[r.student_id] || 0) + 1;
+    const byEkstra = {};
+    rows.forEach(s => {
+      const ekstra = (s.ekstra || '').trim();
+      if (!ekstra || ekstra === '0') return; // no ekskul → nothing to validate
+
+      if (!byEkstra[ekstra]) byEkstra[ekstra] = { ekstra, complete: 0, siswa: [] };
+      const status = (s.syarat_khusus || '').trim().toUpperCase();
+
+      if (status === 'SUDAH') {
+        byEkstra[ekstra].complete++;
+      } else {
+        byEkstra[ekstra].siswa.push({
+          id: s.id,
+          nama: s.nama,
+          kelas: s.kelas,
+          status: status === 'BELUM' ? 'BELUM' : 'KOSONG'
+        });
+      }
     });
 
-    const studentIds = Object.keys(studentAlphaCounts);
-    if (studentIds.length === 0) {
-      overseerAlphaData = [];
-      renderOverseerAlpha();
-      return;
-    }
+    overseerSyaratData = Object.values(byEkstra)
+      .filter(e => e.siswa.length > 0)
+      .map(e => {
+        e.siswa.sort((a, b) => a.nama.localeCompare(b.nama));
+        return e;
+      })
+      .sort((a, b) => b.siswa.length - a.siswa.length || a.ekstra.localeCompare(b.ekstra));
 
-    const { data: students, error: studErr } = await sb
-      .from('Database')
-      .select('id, nama, kelas')
-      .in('id', studentIds);
-
-    if (studErr) throw studErr;
-
-    const byClass = {};
-    (students || []).forEach(s => {
-      const count = studentAlphaCounts[s.id] || 0;
-      if (!byClass[s.kelas]) byClass[s.kelas] = [];
-      byClass[s.kelas].push({ id: s.id, nama: s.nama, alphaCount: count });
-    });
-
-    Object.values(byClass).forEach(list => {
-      list.sort((a, b) => b.alphaCount - a.alphaCount || a.nama.localeCompare(b.nama));
-    });
-
-    overseerAlphaData = Object.entries(byClass)
-      .map(([kelas, siswa]) => ({
-        kelas,
-        siswa,
-        totalAlpha: siswa.reduce((sum, s) => sum + s.alphaCount, 0)
-      }))
-      .sort((a, b) => b.totalAlpha - a.totalAlpha);
-
-    const { data: wakelData, error: wakelErr } = await sb
-      .from('Wakel')
-      .select('kelas, whatsapp');
-
-    if (!wakelErr && wakelData) {
-      overseerWakelMap = {};
-      wakelData.forEach(w => { overseerWakelMap[w.kelas] = w.whatsapp; });
+    // Pembina WhatsApp numbers (table: Pembina — ekstra, whatsapp)
+    overseerPembinaMap = {};
+    const { data: pembina, error: pErr } = await sb.from('Pembina').select('ekstra, whatsapp');
+    if (pErr) {
+      console.warn('Tabel Pembina belum bisa dibaca:', pErr.message);
     } else {
-      overseerWakelMap = {};
+      (pembina || []).forEach(p => { overseerPembinaMap[(p.ekstra || '').trim()] = p.whatsapp; });
     }
 
-    renderOverseerAlpha();
+    renderOverseerSyarat();
   } catch (err) {
     console.error(err);
     if (container) container.innerHTML = '<div class="overseer-empty">Gagal memuat data</div>';
   }
 }
 
-function renderOverseerAlpha() {
-  const container = document.getElementById('overseerAlphaList');
-  const footer = document.querySelector('.overseer-alpha-footer');
-  const toggleBtn = document.getElementById('alphaCardToggle');
+function renderOverseerSyarat() {
+  const container = document.getElementById('overseerSyaratList');
+  const summary = document.getElementById('overseerSyaratSummary');
   if (!container) return;
 
-  if (toggleBtn) toggleBtn.textContent = overseerAlphaCardExpanded ? '📂' : '📁';
-
-  if (!overseerAlphaData || overseerAlphaData.length === 0) {
-    container.innerHTML = '<div class="overseer-empty">Tidak ada siswa alpha</div>';
-    if (footer) footer.style.display = 'none';
+  if (!overseerSyaratData.length) {
+    if (summary) summary.textContent = '';
+    container.innerHTML = '<div class="overseer-empty">Semua syarat khusus sudah lengkap ✅</div>';
     return;
   }
 
-  // ===== SHRUNK / COMPACT =====
-  if (!overseerAlphaCardExpanded) {
-    const totalClasses = overseerAlphaData.length;
-    const totalSiswa = overseerAlphaData.reduce((sum, c) => sum + c.siswa.length, 0);
-    const totalAlpha = overseerAlphaData.reduce((sum, c) => sum + c.totalAlpha, 0);
+  const totalSiswa = overseerSyaratData.reduce((sum, e) => sum + e.siswa.length, 0);
+  if (summary) summary.textContent = `${overseerSyaratData.length} ekskul • ${totalSiswa} siswa belum validasi`;
 
-    const topClasses = overseerAlphaData.slice(0, 3).map(c => `
-      <div class="overseer-compact-class">
-        <span class="overseer-compact-name">${escapeHtml(c.kelas)}</span>
-        <span class="overseer-compact-count">${c.totalAlpha} alpha</span>
-      </div>
-    `).join('');
+  container.innerHTML = overseerSyaratData.map((e, idx) => {
+    const isExpanded = overseerSyaratExpanded === e.ekstra;
+    const number = overseerPembinaMap[e.ekstra];
 
-    container.innerHTML = `
-      <div class="overseer-compact-wrap">
-        <div class="overseer-compact-stats">
-          <div class="overseer-compact-stat">
-            <div class="overseer-compact-num">${totalClasses}</div>
-            <div class="overseer-compact-label">Kelas</div>
-          </div>
-          <div class="overseer-compact-stat">
-            <div class="overseer-compact-num">${totalSiswa}</div>
-            <div class="overseer-compact-label">Siswa</div>
-          </div>
-          <div class="overseer-compact-stat">
-            <div class="overseer-compact-num">${totalAlpha}</div>
-            <div class="overseer-compact-label">Total Alpha</div>
-          </div>
-        </div>
-        <div class="overseer-compact-top">${topClasses}</div>
-        ${overseerAlphaData.length > 3 ? `<div class="overseer-compact-more">+${overseerAlphaData.length - 3} kelas lainnya</div>` : ''}
-      </div>
-    `;
-    if (footer) footer.style.display = 'none';
-    return;
-  }
-
-  // ===== EXPANDED =====
-  if (footer) footer.style.display = 'block';
-
-  container.innerHTML = overseerAlphaData.map(cls => {
-    const isExpanded = overseerExpandedClass === cls.kelas;
-    const wakelNum = overseerWakelMap[cls.kelas];
-    const wakelBtn = wakelNum
-      ? `<button class="overseer-wa-class-btn" onclick="event.stopPropagation();sendWakelWa('${escapeHtml(cls.kelas)}')">📤 Kirim ke Wakel</button>`
-      : `<div class="overseer-wa-missing">Nomor wakel belum diatur</div>`;
+    const actions = number
+      ? `<button class="overseer-wa-class-btn" onclick="event.stopPropagation();sendPembinaWa(${idx})">📤 Kirim ke Pembina</button>
+         <button class="overseer-pembina-edit" onclick="event.stopPropagation();editPembinaNumber(${idx})">✏️ Ubah nomor (${escapeHtml(String(number))})</button>`
+      : `<div class="overseer-wa-missing">Nomor pembina belum diatur</div>
+         <button class="overseer-pembina-edit" onclick="event.stopPropagation();editPembinaNumber(${idx})">➕ Atur nomor pembina</button>`;
 
     const studentList = isExpanded ? `
       <div class="overseer-alpha-students">
-        ${cls.siswa.map(s => `
+        ${e.siswa.map(s => `
           <div class="overseer-alpha-student">
-            <span class="overseer-alpha-name">${escapeHtml(s.nama)}</span>
-            <span class="overseer-alpha-count">${s.alphaCount}x ALPHA</span>
+            <span class="overseer-alpha-name">${escapeHtml(s.nama)} <small style="color:var(--text-secondary)">• ${escapeHtml(s.kelas || '-')}</small></span>
+            <span class="overseer-alpha-count">${s.status}</span>
           </div>
         `).join('')}
-        <div class="overseer-alpha-actions">${wakelBtn}</div>
+        <div class="overseer-alpha-actions">${actions}</div>
       </div>
     ` : '';
 
     return `
       <div class="overseer-alpha-class">
-        <div class="overseer-alpha-header" onclick="toggleAlphaClass('${escapeHtml(cls.kelas)}')">
-          <div class="overseer-alpha-classname">${escapeHtml(cls.kelas)}</div>
-          <div class="overseer-alpha-meta">${cls.siswa.length} siswa • ${cls.totalAlpha} alpha</div>
+        <div class="overseer-alpha-header" onclick="toggleSyaratEkstra(${idx})">
+          <div class="overseer-alpha-classname">${escapeHtml(e.ekstra)}</div>
+          <div class="overseer-alpha-meta">${e.siswa.length} belum • ${e.complete} sudah</div>
           <div class="overseer-alpha-arrow">${isExpanded ? '▲' : '▼'}</div>
         </div>
         ${studentList}
@@ -392,9 +335,11 @@ function renderOverseerAlpha() {
   }).join('');
 }
 
-function toggleAlphaClass(kelas) {
-  overseerExpandedClass = overseerExpandedClass === kelas ? null : kelas;
-  renderOverseerAlpha();
+function toggleSyaratEkstra(idx) {
+  const e = overseerSyaratData[idx];
+  if (!e) return;
+  overseerSyaratExpanded = overseerSyaratExpanded === e.ekstra ? null : e.ekstra;
+  renderOverseerSyarat();
 }
 
 function cleanWaNumber(num) {
@@ -404,36 +349,52 @@ function cleanWaNumber(num) {
   return digits;
 }
 
-function formatAlphaReport(kelas, siswaList) {
-  const lines = siswaList.map(s => `- ${s.nama} — ALPHA ${s.alphaCount}x`);
-  return `*LAPORAN SISWA ALPHA KELAS ${kelas}*\n\n${kelas} • ${siswaList.length} siswa\n${lines.join('\n')}`;
+function formatSyaratMessage(ekstra, siswaList) {
+  const names = siswaList.map(s => `* ${s.nama}`).join('\n');
+  return `Pembina ekskul ${ekstra}\nSiswa atas nama\n\n${names}\n\nbelum mendapatkan validasi syarat khusus, harap dicek kembali\nTerima kasih\n\nKoordinator ekskul`;
 }
 
-function sendWakelWa(kelas) {
-  const cls = overseerAlphaData.find(c => c.kelas === kelas);
-  const number = overseerWakelMap[kelas];
-  if (!cls) return;
+function sendPembinaWa(idx) {
+  const e = overseerSyaratData[idx];
+  if (!e) return;
+  const number = cleanWaNumber(overseerPembinaMap[e.ekstra]);
   if (!number) {
-    showStatus("Nomor wakel tidak tersedia", "error");
+    showStatus('Nomor pembina tidak tersedia', 'error');
     return;
   }
-  const text = formatAlphaReport(kelas, cls.siswa);
-  const url = `https://wa.me/${cleanWaNumber(number)}?text=${encodeURIComponent(text)}`;
+  const url = `https://wa.me/${number}?text=${encodeURIComponent(formatSyaratMessage(e.ekstra, e.siswa))}`;
   window.open(url, '_blank');
 }
 
-function sendAllWakelWa() {
-  if (!overseerAlphaData || overseerAlphaData.length === 0) return;
-  let text = `*LAPORAN SISWA ALPHA SEMUA KELAS*\n\n`;
-  overseerAlphaData.forEach(cls => {
-    text += `*${cls.kelas}* • ${cls.siswa.length} siswa\n`;
-    cls.siswa.forEach(s => {
-      text += `- ${s.nama} — ALPHA ${s.alphaCount}x\n`;
-    });
-    text += `\n`;
-  });
-  const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
-  window.open(url, '_blank');
+async function editPembinaNumber(idx) {
+  const e = overseerSyaratData[idx];
+  if (!e) return;
+
+  const current = overseerPembinaMap[e.ekstra] || '';
+  const input = window.prompt(`Nomor WhatsApp pembina ${e.ekstra}\n(contoh: 081234567890)`, current);
+  if (input === null) return; // cancelled
+
+  const cleaned = cleanWaNumber(input);
+  if (cleaned.length < 9) {
+    showStatus('Nomor tidak valid', 'error');
+    return;
+  }
+
+  showLoading(true);
+  try {
+    const { error } = await sb
+      .from('Pembina')
+      .upsert({ ekstra: e.ekstra, whatsapp: cleaned }, { onConflict: 'ekstra' });
+    if (error) throw error;
+
+    overseerPembinaMap[e.ekstra] = cleaned;
+    showStatus('Nomor pembina disimpan', 'ok');
+    renderOverseerSyarat();
+  } catch (err) {
+    console.error(err);
+    showStatus('Gagal menyimpan nomor: ' + err.message, 'error');
+  }
+  showLoading(false);
 }
 // ===== SECTION 3: JUMLAH SISWA PER EKSKUL =====
 async function loadOverseerEkstra() {

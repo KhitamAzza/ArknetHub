@@ -154,3 +154,42 @@
 #dendaDiterimaScreen .bottom-bar {
   flex-shrink: 0;
 }
+/* ===== Denda Diterima: submitter filter chips + daily fund summary =====
+   Append to style/denda.css. Colors use fallbacks — swap in your theme vars. */
+.denda-filter-chips {
+  display: flex; gap: 8px; padding: 4px 16px 8px;
+  overflow-x: auto; -webkit-overflow-scrolling: touch; flex-shrink: 0;
+}
+.denda-chip {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: 6px 12px; border-radius: 12px; flex-shrink: 0; cursor: pointer;
+  background: transparent; color: var(--text);
+  border: 1px solid rgba(128,128,128,.35); font: inherit;
+}
+.denda-chip-name { font-size: 13px; font-weight: 600; white-space: nowrap; }
+.denda-chip-amount { font-size: 11px; opacity: .7; }
+.denda-chip.active {
+  background: var(--accent, #d4a017); border-color: var(--accent, #d4a017); color: #111;
+}
+.denda-chip.active .denda-chip-amount { opacity: .85; }
+
+.denda-daily-summary { padding: 0 16px 8px; flex-shrink: 0; }
+.denda-daily-details {
+  border: 1px solid rgba(128,128,128,.35); border-radius: 12px; overflow: hidden;
+}
+.denda-daily-details summary {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 14px; cursor: pointer; font-weight: 600; list-style: none; color: var(--text);
+}
+.denda-daily-details summary::-webkit-details-marker { display: none; }
+.denda-daily-grand { font-variant-numeric: tabular-nums; }
+.denda-daily-details[open] summary { border-bottom: 1px solid rgba(128,128,128,.25); }
+.denda-daily-row { padding: 8px 14px; border-bottom: 1px solid rgba(128,128,128,.15); }
+.denda-daily-row:last-child { border-bottom: none; }
+.denda-daily-main { display: flex; justify-content: space-between; gap: 8px; color: var(--text); }
+.denda-daily-label small { opacity: .6; font-weight: 400; }
+.denda-daily-total { font-weight: 600; font-variant-numeric: tabular-nums; }
+.denda-daily-sub {
+  display: flex; justify-content: space-between; padding: 2px 0 0 12px;
+  font-size: 12px; opacity: .75; color: var(--text);
+}
