@@ -738,20 +738,28 @@ async function fetchTatibMinusData() {
   const nilaiMinusTerlambat = config.nilaiMinusTerlambat || 0;
   const threshold = config.minusPointThreshold ?? -30;
 
-  const { data: students, error: sErr } = await sb.from('Database').select('id, nama, kelas');
+  // Paginated + ordered: a plain select is capped at 1000 rows, so students
+  // (and their violations/redemptions) past the cap silently went missing
+  // from this list. Same approach as fetchTatibDebtData().
+  const { data: students, error: sErr } = await tatibFetchAll(() => sb
+    .from('Database')
+    .select('id, nama, kelas')
+    .order('id', { ascending: true }));
   if (sErr) throw new Error("Gagal memuat database: " + sErr.message);
 
-  const { data: violations, error: vErr } = await sb
+  const { data: violations, error: vErr } = await tatibFetchAll(() => sb
     .from('AttendanceV2')
     .select('student_id, status')
     .eq('semester', currentSemester)
-    .in('status', ['ALPHA', 'TERLAMBAT', 'TELAT']);
+    .in('status', ['ALPHA', 'TERLAMBAT', 'TELAT'])
+    .order('id', { ascending: true }));
   if (vErr) throw new Error("Gagal memuat pelanggaran: " + vErr.message);
 
-  const { data: redemptions, error: rErr } = await sb
+  const { data: redemptions, error: rErr } = await tatibFetchAll(() => sb
     .from('Redemptions')
     .select('student_id, poin')
-    .eq('semester', currentSemester);
+    .eq('semester', currentSemester)
+    .order('id', { ascending: true }));
   if (rErr) throw new Error("Gagal memuat redemptions: " + rErr.message);
 
   const { data: wakelRows, error: wErr } = await sb.from('Wakel').select('kelas, nama, whatsapp');
