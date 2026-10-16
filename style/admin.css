@@ -4,7 +4,16 @@
   flex-direction: column;
   height: 100dvh;
   padding: 24px 16px;
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
   background: var(--bg);
+  overflow-y: auto;                 /* menu bisa discroll kalau tombol lebih tinggi dari layar */
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* jangan biarkan header / grid menyusut saat tombol bertambah — biarkan overflow lalu discroll */
+#adminScreen > * {
+  flex-shrink: 0;
 }
 
 .admin-grid {
