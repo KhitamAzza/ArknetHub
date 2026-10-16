@@ -2,9 +2,10 @@
 // tambahpoin.js — Admin: Tambah Poin (Supabase)
 // Menambah poin penebusan ke tabel Redemptions, versi admin dari
 // redemption.js. Poin 1-10 persis (slider), tidak pernah melewati 0.
-// Butuh: sb, currentSemester, currentOperator, loadSupabaseConfig,
+// Dipakai dua role: Admin (dari adminScreen) dan Tatib (dari tatibScreen).
+// Butuh: sb, currentSemester, currentOperator, isTatib, loadSupabaseConfig,
 // showStatus, showLoading, hideAllScreens, showAdminScreen (main.js),
-// escapeHtml, tatibFetchAll (tatib.js).
+// showTatibScreen, escapeHtml, tatibFetchAll (tatib.js).
 // ============================================
 
 const TP_MIN_POINT = 1;
@@ -26,10 +27,14 @@ let tpSelectToken = 0;        // cegah respons lama menimpa pilihan terbaru
 // ============================================
 
 // Redemptions.guru dipakai redemption.js buat hitung batas harian per guru.
-// Suffix "(Admin)" menjaga input admin tidak ikut menghabiskan jatah guru
-// yang kebetulan namanya sama.
+// Suffix "(Admin)" / "(Tatib)" menjaga input dari sini tidak ikut menghabiskan
+// jatah guru yang kebetulan namanya sama.
+function tpRoleLabel() {
+  return isTatib ? "Tatib" : "Admin";
+}
+
 function tpGuruLabel() {
-  return (currentOperator || "Admin") + " (Admin)";
+  return (currentOperator || tpRoleLabel()) + " (" + tpRoleLabel() + ")";
 }
 
 function tpMinusValue(v, fallback) {
@@ -66,6 +71,8 @@ async function showTambahPoin() {
     hideAllScreens();
     const el = document.getElementById("tambahPoinScreen");
     if (el) el.style.display = "flex";
+    const sub = document.getElementById("tpHeaderSub");
+    if (sub) sub.textContent = "Kurangi minus poin siswa (" + tpRoleLabel() + ")";
     resetTambahPoinUI();
 
     // Roster diambil ulang tiap masuk supaya kelas/nama yang ditulis
@@ -87,7 +94,8 @@ function closeTambahPoin() {
   closeTambahPoinModal();
   resetTambahPoinUI();
   hideAllScreens();
-  showAdminScreen();
+  if (isTatib) showTatibScreen();
+  else showAdminScreen();
 }
 
 function resetTambahPoinUI() {
