@@ -107,7 +107,8 @@ function hideAllScreens() {
     "tatibBermasalahScreen", "kelolaSiswaScreen", "tanpaEkstraModal",
     "expelModal", "paperScreen", "adminInputScreen", "proofViewerScreen",
     "kelolaAbsensiScreen", "printAbsensiScreen",
-    "penarikanDendaScreen", "adminDendaPaymentScreen", "dendaDiterimaScreen"
+    "penarikanDendaScreen", "adminDendaPaymentScreen", "dendaDiterimaScreen",
+    "tambahPoinScreen"
   ];
   ids.forEach(id => {
     const el = document.getElementById(id);
@@ -116,6 +117,9 @@ function hideAllScreens() {
 
   const tatibModal = document.getElementById("tatibPaymentModal");
   if (tatibModal) tatibModal.classList.remove("visible");
+
+  const tambahPoinModal = document.getElementById("tambahPoinModal");
+  if (tambahPoinModal) tambahPoinModal.classList.remove("visible");
 
   if (summaryModal) summaryModal.classList.remove("visible");
   closeSearch();

@@ -314,6 +314,9 @@ async function saveFixerEdit() {
   const targetStudentId = fixerEditTarget.studentId;   // ← capture this
   const targetDate = fixerEditTarget.date;
   const targetNama = fixerEditTarget.nama;
+  // Fixer-set statuses lock Input Absensi (except HADIR, which never locks).
+  // The lock lives in AttendanceV2.locked_by; a HADIR write clears any old lock.
+  const fixerLockValue = String(newStatus).trim().toUpperCase() === 'HADIR' ? null : 'fixer';
 
   closeFixerEdit();
   showLoading(true);
@@ -323,7 +326,7 @@ async function saveFixerEdit() {
       // ── UPDATE existing rows ──
       const { error } = await sb
   .from('AttendanceV2')
-  .update({ status: newStatus })
+  .update({ status: newStatus, locked_by: fixerLockValue })
   .in('id', targetRowIds);
 
       if (error) throw error;
@@ -335,7 +338,8 @@ async function saveFixerEdit() {
     student_id: targetStudentId,
     date: targetDate,
     semester: currentSemester,
-    status: newStatus
+    status: newStatus,
+    locked_by: fixerLockValue
   });
 
       if (error) throw error;
@@ -1497,6 +1501,7 @@ async function loadAdminEkstraAttendanceStatus() {
 // ===== ADMIN MANUAL INPUT =====
 let adminInputStudents = [];
 let adminInputChanges = new Map();
+let adminInputUnlocked = new Set(); // ids unlocked this session (the DB lock stays until a save rewrites the row)
 
 function showAdminInput() {
   hideAllScreens();
@@ -1524,6 +1529,7 @@ async function initAdminInput() {
   loadAdminEkstraAttendanceStatus();
   adminInputStudents = [];
   adminInputChanges.clear();
+  adminInputUnlocked.clear();
   const list = document.getElementById('adminInputList');
   if (list) list.innerHTML = '<div class="empty-state" style="padding-top:40px;"><div class="empty-state-icon">📋</div><div class="empty-state-text">Pilih ekskul untuk memulai input</div></div>';
   updateAdminInputStats();
@@ -1606,17 +1612,23 @@ async function loadAdminInputList() {
     if (sErr) throw sErr;
 
     const { data: att, error: aErr } = await sb
-      .from('AttendanceV2').select('student_id, status').eq('date', today).eq('semester', currentSemester);
+      .from('AttendanceV2').select('student_id, status, locked_by').eq('date', today).eq('semester', currentSemester);
     if (aErr) throw aErr;
 
     const attMap = {};
-    (att || []).forEach(a => attMap[a.student_id] = a.status);
+    const lockMap = {};
+    (att || []).forEach(a => {
+      attMap[a.student_id] = a.status;
+      lockMap[a.student_id] = a.locked_by || null;
+    });
 
     adminInputStudents = (students || []).map(s => ({
       id: s.id, nama: s.nama, kelas: s.kelas, photo_url: s.photo_url,
-      currentStatus: attMap[s.id] || null
+      currentStatus: attMap[s.id] || null,
+      lockedBy: lockMap[s.id] || null
     }));
     adminInputChanges.clear();
+    adminInputUnlocked.clear();
     renderAdminInputList();
     updateAdminInputStats();
   } catch (err) {
@@ -1632,6 +1644,8 @@ let adminPickerTargetId = null;
 
 function onAdminRowMouseDown(e, id) {
   adminLongPressTriggered = false;
+  // Locked rows: no press feedback and no long-press picker
+  if (isAdminInputLocked(adminInputStudents.find(s => String(s.id) === String(id)))) return;
   adminPickerTargetId = id;
   const row = e.currentTarget;
   if (row) row.style.transform = 'scale(0.97)';
@@ -1674,6 +1688,10 @@ function onAdminRowClick(e, id) {
 }
 
 function openAdminInputPicker(id) {
+  if (isAdminInputLocked(adminInputStudents.find(s => String(s.id) === String(id)))) {
+    showStatus("Status terkunci — tap 🔒 untuk membuka", "info");
+    return;
+  }
   adminPickerTargetId = id;
   const modal = document.getElementById('adminInputPickerModal');
   if (modal) modal.classList.add('visible');
@@ -1880,6 +1898,20 @@ function cycleAdminInputStatus(id) {
   setAdminInputStatus(id, nextStatus);
 }
 
+// Locked = helper/Fixer wrote a non-HADIR status today (locked_by set) and the
+// admin hasn't tapped its 🔒 yet. HADIR never counts as locked.
+function isAdminInputLocked(student) {
+  if (!student || !student.lockedBy) return false;
+  if ((student.currentStatus || '').trim().toUpperCase() === 'HADIR') return false;
+  return !adminInputUnlocked.has(String(student.id));
+}
+
+function unlockAdminInputRow(id) {
+  adminInputUnlocked.add(String(id));
+  renderAdminInputList();
+  showStatus("🔓 Status dibuka, sekarang bisa diubah", "info");
+}
+
 function getAdminStatusClass(status) {
   const s = (status || '').trim().toUpperCase();
   if (s === 'HADIR') return 'status-hadir';
@@ -1913,8 +1945,10 @@ function renderAdminInputList() {
 
     const safeId = String(s.id).replace(/'/g, "\'");
 
+    const locked = isAdminInputLocked(s);
+
     return `
-      <div class="admin-input-row"
+      <div class="admin-input-row${locked ? ' locked' : ''}"
            data-id="${safeId}"
            onclick="onAdminRowClick(event, '${safeId}')"
            onmousedown="onAdminRowMouseDown(event, '${safeId}')"
@@ -1928,6 +1962,10 @@ function renderAdminInputList() {
           <div class="admin-input-class">${escapeHtml(s.kelas)}</div>
         </div>
         <div class="admin-input-status ${statusClass}">${escapeHtml(statusLabel)}</div>
+        ${locked ? `<button type="button" class="admin-input-lock" aria-label="Buka kunci status"
+            onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()"
+            onmouseup="event.stopPropagation()" ontouchend="event.stopPropagation()"
+            onclick="event.stopPropagation(); unlockAdminInputRow('${safeId}')">🔒</button>` : ''}
       </div>
     `;
   }).join('');
@@ -1939,6 +1977,10 @@ function renderAdminInputList() {
 function setAdminInputStatus(id, status) {
   const student = adminInputStudents.find(s => String(s.id) === String(id));
   if (!student) return;
+  if (isAdminInputLocked(student)) {
+    showStatus("Status terkunci — tap 🔒 untuk membuka", "info");
+    return;
+  }
   const original = student.currentStatus || '';
   if (status === original) adminInputChanges.delete(id);
   else adminInputChanges.set(id, status);
@@ -1947,11 +1989,14 @@ function setAdminInputStatus(id, status) {
 }
 
 function markAllAdminInputHadir() {
+  let skipped = 0;
   adminInputStudents.forEach(s => {
+    if (isAdminInputLocked(s)) { skipped++; return; } // helper/Fixer statuses stay untouched
     if ((s.currentStatus || '') !== 'HADIR') adminInputChanges.set(s.id, 'HADIR');
   });
   renderAdminInputList();
   updateAdminInputStats();
+  if (skipped > 0) showStatus(`${skipped} siswa dilewati (status terkunci)`, "info");
 }
 
 function updateAdminInputStats() {
@@ -2310,7 +2355,7 @@ async function submitAdminInput() {
     const upserts = [];
     const toDelete = [];
     adminInputChanges.forEach((status, id) => {
-      if (status) upserts.push({ student_id: id, date: today, status, semester: currentSemester, operator: currentOperator });
+      if (status) upserts.push({ student_id: id, date: today, status, semester: currentSemester, operator: currentOperator, locked_by: null });
       else toDelete.push(id);
     });
 

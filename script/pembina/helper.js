@@ -394,7 +394,8 @@ async function submitLateRecord() {
       student_id: s.id,
       date: today,
       semester: currentSemester,
-      status: 'TERLAMBAT'
+      status: 'TERLAMBAT',
+      locked_by: 'helper' // Input Absensi (admin) treats this as locked
     }));
 
     if (inserts.length > 0) {

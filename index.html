@@ -511,6 +511,11 @@
   <div class="dash-label">Penarikan Denda Siswa</div>
   <div class="dash-desc">Setoran & konfirmasi tatib</div>
 </div>
+    <div class="dash-btn" onclick="showTambahPoin()">
+  <div class="dash-icon"><svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></svg></div>
+  <div class="dash-label">Tambah Poin</div>
+  <div class="dash-desc">Kurangi minus siswa</div>
+</div>
         <div class="dash-btn logout" onclick="doLogout()">
       <div class="dash-icon"><svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-logout-2"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M10 8v-2a2 2 0 0 1 2 -2h7a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-7a2 2 0 0 1 -2 -2v-2" /><path d="M15 12h-12l3 -3" /><path d="M6 15l-3 -3" /></svg></div>
       <div class="dash-label">Keluar</div>
@@ -1429,6 +1434,68 @@
   <button class="install-banner-btn" id="installBannerBtn">Install</button>
   <button class="install-banner-close" id="installBannerClose">✕</button>
 </div>
+<!-- TAMBAH POIN (ADMIN) -->
+<div id="tambahPoinScreen" style="display:none;">
+  <div class="app-header">
+    <button class="icon-btn" onclick="closeTambahPoin()">◀</button>
+    <div class="operator-info" style="flex:1;margin-left:12px;">
+      <div class="operator-name">Tambah Poin</div>
+      <div class="operator-ekstra">Kurangi minus poin siswa (Admin)</div>
+    </div>
+  </div>
+
+  <div class="tp-body">
+    <div class="tp-hero">
+      <div class="tp-hero-icon">➕</div>
+      <div class="tp-hero-title">Tambah Poin</div>
+      <div class="tp-hero-sub">Cari siswa, lalu beri 1-10 poin</div>
+    </div>
+
+    <div class="tp-search-wrap">
+      <input type="text" id="tpSearchInput" class="tp-search" placeholder="Cari nama siswa..." oninput="onTambahPoinSearch()" autocomplete="off">
+      <div id="tpSuggestions" class="tp-suggestions"></div>
+    </div>
+
+    <div class="tp-empty" id="tpEmpty">
+      <div class="tp-empty-icon">🔎</div>
+      <div class="tp-empty-text">Ketik minimal 2 huruf nama siswa</div>
+    </div>
+
+    <div id="tpDetail" style="display:none;"></div>
+  </div>
+</div>
+
+<!-- TAMBAH POIN MODAL -->
+<div id="tambahPoinModal" class="modal-overlay">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title">Tambah Poin</div>
+      <button class="icon-btn" onclick="closeTambahPoinModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="tatib-detail-header">
+        <div class="tatib-detail-name" id="tpModalName">-</div>
+        <div class="tatib-detail-class" id="tpModalClass">-</div>
+      </div>
+
+      <div class="tp-slider-wrap">
+        <div class="tp-slider-label" id="tpSliderLabel"></div>
+        <input type="range" id="tpSlider" class="tp-slider" min="1" max="10" step="1" value="3" oninput="updateTpSliderLabel()">
+        <div class="tp-slider-marks" id="tpSliderMarks"></div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Deskripsi</label>
+        <textarea id="tpDesc" class="form-input" placeholder="Alasan penambahan poin..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeTambahPoinModal()">Batal</button>
+      <button class="btn-primary" id="tpSubmitBtn" onclick="submitTambahPoin()">Simpan</button>
+    </div>
+  </div>
+</div>
+
 <!-- ADMIN INPUT STATUS PICKER -->
 <div id="adminInputPickerModal" class="modal-overlay">
   <div class="modal-sheet">
@@ -1503,6 +1570,7 @@
 <script src="script/pembina/helper.js"></script>
 <script src="script/admin/admin.js"></script>
 <script src="script/admin/denda.js"></script>
+<script src="script/admin/tambahpoin.js"></script>
 <script src="script/admin/overseer.js"></script>
 <script src="script/tatib/tatib.js"></script>
 <script src="script/utility/navigation.js"></script>
