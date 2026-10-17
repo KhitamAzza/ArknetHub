@@ -544,6 +544,7 @@ async function uploadPaper() {
     }, { onConflict: 'ekstra,date,semester,page' });
     
     if (dbErr) throw dbErr;
+if (typeof adminProofCache !== 'undefined') adminProofCache = {};
     
     showStatus('✓ Bukti absensi berhasil diupload', 'ok');
 
