@@ -34,6 +34,7 @@ const SHELL_ASSETS = [
   './overseer.js',
   './navigation.js',
   './denda.js',
+  '.tambahpoin.js,
 
   // Icons
   './ArknetHub-192.png',
