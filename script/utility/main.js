@@ -126,6 +126,7 @@ function hideAllScreens() {
 }
 // ===== LOGIN / LOGOUT =====
 async function doLogin() {
+  try { await loadSupabaseConfig(); } catch (e) { console.error(e); }
   const rawPassword = passwordInput.value.trim();
   const password = rawPassword.toLowerCase();
 
@@ -622,7 +623,7 @@ function showDaftarSiswa() {
 
 async function loadSupabaseConfig() {
     const { data, error } = await sb.from('Config').select('*').single();
-    if (error || !data) return getDefaultConfig();
+    if (error || !data) throw error || new Error('Config kosong');
     
     // Set global so every module uses the same semester
     currentSemester = data.current_semester || 'STS (Ganjil)';
