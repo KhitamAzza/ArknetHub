@@ -708,14 +708,23 @@ async function saveConfigChanges() {
 
     if (error) throw error;
 
+    // Keep the global semester in sync so this session doesn't keep
+    // writing to the old one, and drop the cached bundle (it was built
+    // with the old semester).
+    if (dbChanges.current_semester) {
+      currentSemester = dbChanges.current_semester;
+      if (typeof appBundle !== "undefined") appBundle = null;
+    }
+
     showStatus("✓ Config diperbarui", "ok");
     configChanges = {};
-    loadConfigValues();
+    await loadConfigValues();
   } catch (err) {
     showStatus("Error: " + err.message, "error");
   }
   showLoading(false);
 }
+
 // ===== KELOLA SISWA =====
 let kelolaAllStudents = [];
 let kelolaSelectedStudent = null;
