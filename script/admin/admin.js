@@ -2090,19 +2090,19 @@ async function loadAdminProofPhoto(ekstra, date) {
 
   let proofs = adminProofCache[cacheKey];
   if (proofs === undefined) {
-    try {
-      const { data, error } = await sb
-        .from('AttendanceProof')
-        .select('photo_url, uploaded_by, uploaded_at, page')
-        .eq('ekstra', ekstra).eq('date', date).eq('semester', currentSemester)
-        .order('page', { ascending: true });
-      if (error) throw error;
-      proofs = data || [];
-    } catch (e) {
-      proofs = [];
-    }
-    adminProofCache[cacheKey] = proofs;
+  try {
+    const { data, error } = await sb
+      .from('AttendanceProof')
+      .select('photo_url, uploaded_by, uploaded_at, page')
+      .eq('ekstra', ekstra).eq('date', date).eq('semester', currentSemester)
+      .order('page', { ascending: true });
+    if (error) throw error;
+    proofs = data || [];
+    if (proofs.length) adminProofCache[cacheKey] = proofs;  // don't cache empty
+  } catch (e) {
+    proofs = [];                                            // don't cache errors
   }
+}
 
   if (token !== adminProofLoadToken) return; // superseded by a newer request
 
