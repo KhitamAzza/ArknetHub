@@ -492,7 +492,7 @@ async function selectWaReportDate(date) {
   try {
     // 1. All students (paginated — a large school can exceed 1000 rows)
     const allStudents = await fetchAllRows((from, to) =>
-      sb.from('Database').select('id, nama, kelas').range(from, to)
+      sb.from('Database').select('id, nama, kelas, ekstra').range(from, to)
     );
 
     // 2. AttendanceV2 for selected date (paginated for the same reason)
@@ -569,7 +569,7 @@ async function selectWaReportDate(date) {
                      s.reportStatus === 'TERLAMBAT' ? 'var(--yellow)' : 'var(--accent)';
         previewHtml += `
           <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;">
-            <span>${escapeHtml(s.nama)}</span>
+            <span>${escapeHtml(s.nama)} - ${escapeHtml(s.ekstra || '-')}</span>
             <span style="color:${color};font-weight:700;">${s.reportStatus}</span>
           </div>`;
       });
@@ -650,8 +650,9 @@ function sendWaReport() {
   Object.entries(byClass).forEach(([kelas, siswa]) => {
     text += `*${kelas}*\n`;
     siswa.forEach(s => {
-      text += `- ${s.nama} (${s.reportStatus})\n`;
-    });
+  const ek = (s.ekstra && s.ekstra.trim() !== '0') ? s.ekstra.trim() : '-';
+  text += `- ${s.nama} - ${ek} - ${s.reportStatus}\n`;
+});
     text += '\n';
   });
 
