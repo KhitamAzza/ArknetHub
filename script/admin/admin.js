@@ -389,7 +389,8 @@ const CONFIG_DB_MAP = {
   omrRequireCorners: 'omr_require_corners',
   uploadBackend: 'upload_backend',
   nilaiEnable: 'nilai_enable',
-  daringMode: 'daring_mode'
+  daringMode: 'daring_mode',
+  daringKelas: 'daring_kelas'
 };
 
 function initConfigMenu() {
@@ -430,7 +431,8 @@ async function loadConfigValues() {
   uploadBackend: data.upload_backend || 'cloudinary',
   omrRequireCorners: data.omr_require_corners,
   nilaiEnable: data.nilai_enable !== false,
-  daringMode: data.daring_mode === true
+  daringMode: data.daring_mode === true,
+  daringKelas: data.daring_kelas || 'ALL'
 };
 
     const { data: ketuaData, error: ketuaErr } = await sb
@@ -465,6 +467,8 @@ function renderConfigMenu() {
     title: "Menu pembina",
     items: [
       { key: "daringMode", label: "Mode Daring (pembina input langsung, tanpa foto)", type: "toggle" },
+      { key: "daringKelas", label: "Filter Kelas (Mode Daring): kelas yang boleh diabsen", type: "select", showIf: "daringMode",
+        options: [{ value: "ALL", label: "Semua kelas" }, { value: "X", label: "Kelas X saja" }, { value: "XI", label: "Kelas XI saja" }] },
       { key: "nilaiEnable", label: "Aktifkan menu Nilai Ekskul", type: "toggle" },
       { type: "danger", label: "Reset semua nilai ekskul", desc: "Mengembalikan nilai seluruh siswa ke 0. Tidak bisa dibatalkan.", btn: "Reset", action: "openNilaiPurge()" }
     ]
@@ -526,6 +530,12 @@ function renderConfigMenu() {
 }
 function renderConfigItem(item) {
   const val = configChanges[item.key] !== undefined ? configChanges[item.key] : configCache[item.key];
+
+  // Conditional items: only shown while another toggle is on (counts unsaved changes too)
+  if (item.showIf) {
+    const dep = configChanges[item.showIf] !== undefined ? configChanges[item.showIf] : configCache[item.showIf];
+    if (!(dep === true || String(dep).toUpperCase() === "TRUE")) return "";
+  }
 
   if (item.type === "danger") {
     return `
@@ -616,7 +626,11 @@ function renderConfigItem(item) {
     `;
   }
     if (item.type === "select") {
-    const opts = item.options.map(o => `<option value="${o}" ${val === o ? 'selected' : ''}>${o}</option>`).join('');
+    const opts = item.options.map(o => {
+      const ov = (typeof o === 'object') ? o.value : o;
+      const ol = (typeof o === 'object') ? o.label : o;
+      return `<option value="${ov}" ${val === ov ? 'selected' : ''}>${ol}</option>`;
+    }).join('');
     return `
       <div class="config-item">
         <div class="config-label">${item.label}</div>

@@ -8,6 +8,49 @@ const DARING_STATUSES = ['', 'HADIR', 'ALPHA']; // tap cycle order
 let daringStudents = [];
 let daringChanges = new Map();   // student_id -> 'HADIR' | 'ALPHA' | ''
 let daringWindow = { start: 0, end: 24 };
+let daringGradeFilter = 'ALL';   // 'ALL' | 'X' | 'XI'  (pembina's own view filter)
+let daringKelasRule = 'ALL';     // 'ALL' | 'X' | 'XI'  (admin rule from Config.daring_kelas, absolute)
+
+function isDaringGradeAllowed(kelas) {
+  return daringKelasRule === 'ALL' || getDaringGrade(kelas) === daringKelasRule;
+}
+
+// "X DKV 1" -> 'X', "XI TKJ 2" -> 'XI', anything else -> 'LAIN'
+function getDaringGrade(kelas) {
+  const first = String(kelas || '').trim().toUpperCase().split(/\s+/)[0];
+  return (first === 'X' || first === 'XI') ? first : 'LAIN';
+}
+
+function getVisibleDaringStudents() {
+  if (daringGradeFilter === 'ALL') return daringStudents;
+  return daringStudents.filter(s => getDaringGrade(s.kelas) === daringGradeFilter);
+}
+
+function setDaringFilter(grade) {
+  daringGradeFilter = grade;
+  renderDaringFilter();
+  renderDaringList();
+}
+
+function renderDaringFilter() {
+  const row = document.getElementById('daringFilterRow');
+  if (!row) return;
+  // Admin locked it to one grade: no filter needed, just say so.
+  if (daringKelasRule !== 'ALL') {
+    row.innerHTML = `<div style="font-size:13px;color:var(--text-secondary);">Hanya Kelas ${daringKelasRule} yang dapat diabsen</div>`;
+    return;
+  }
+  const count = g => g === 'ALL'
+    ? daringStudents.length
+    : daringStudents.filter(s => getDaringGrade(s.kelas) === g).length;
+  const opts = [['ALL', 'Semua'], ['X', 'Kelas X'], ['XI', 'Kelas XI']];
+  row.innerHTML = opts.map(([g, label]) => `
+    <button type="button" class="admin-ekstra-chip${daringGradeFilter === g ? ' active' : ''}"
+            onclick="setDaringFilter('${g}')">
+      <span class="admin-ekstra-chip-label">${label} (${count(g)})</span>
+    </button>
+  `).join('');
+}
 
 // Small helper (also used by admin input to hide the proof photo pane)
 async function fetchDaringMode() {
@@ -28,11 +71,12 @@ async function openAbsensiPembina() {
   try {
     const { data, error } = await sb
       .from('Config')
-      .select('daring_mode, mulai_pengumpulan, batas_pengumpulan_absensi')
+      .select('daring_mode, daring_kelas, mulai_pengumpulan, batas_pengumpulan_absensi')
       .eq('id', 1)
       .single();
     if (error) throw error;
     daring = data.daring_mode === true;
+    daringKelasRule = data.daring_kelas || 'ALL';
     daringWindow = {
       start: data.mulai_pengumpulan ?? 0,
       end: data.batas_pengumpulan_absensi ?? 24
@@ -67,6 +111,7 @@ function showDaringScreen() {
 
 async function initDaring() {
   daringChanges.clear();
+  daringGradeFilter = 'ALL';
   const label = document.getElementById('daringEkstraLabel');
   if (label) label.textContent = currentEkstra || '-';
   renderDaringWindowNote();
@@ -115,7 +160,7 @@ async function loadDaringList() {
     const attMap = {};
     (att || []).forEach(a => { attMap[a.student_id] = a; });
 
-    daringStudents = (students || []).map(s => {
+    daringStudents = (students || []).filter(s => isDaringGradeAllowed(s.kelas)).map(s => {
       const a = attMap[s.id];
       return {
         id: s.id,
@@ -126,6 +171,7 @@ async function loadDaringList() {
       };
     });
     daringChanges.clear();
+    renderDaringFilter();
     renderDaringList();
     updateDaringStats();
   } catch (err) {
@@ -151,12 +197,13 @@ function renderDaringList() {
   const container = document.getElementById('daringList');
   if (!container) return;
 
-  if (daringStudents.length === 0) {
+  const visible = getVisibleDaringStudents();
+  if (visible.length === 0) {
     container.innerHTML = '<div class="empty-state" style="padding-top:40px;"><div class="empty-state-icon">📭</div><div class="empty-state-text">Tidak ada siswa</div></div>';
     return;
   }
 
-  container.innerHTML = daringStudents.map((s, i) => {
+  container.innerHTML = visible.map((s, i) => {
     const changed = daringChanges.get(s.id);
     const status = changed !== undefined ? changed : (s.currentStatus || '');
     const locked = isDaringLocked(s);
@@ -199,7 +246,8 @@ function cycleDaringStatus(id) {
 
 function markAllDaringHadir() {
   let skipped = 0;
-  daringStudents.forEach(s => {
+  // Only the students currently shown (respects the Kelas X / XI filter)
+  getVisibleDaringStudents().forEach(s => {
     if (isDaringLocked(s)) { skipped++; return; }
     if ((s.currentStatus || '') !== 'HADIR') daringChanges.set(s.id, 'HADIR');
     else daringChanges.delete(s.id);
@@ -231,11 +279,15 @@ async function submitDaring() {
   const today = getJakartaDateString();
   showLoading(true);
   try {
+    // Re-read the admin rule so a change made after this screen opened still applies
+    const { data: rule } = await sb.from('Config').select('daring_kelas').eq('id', 1).single();
+    daringKelasRule = (rule && rule.daring_kelas) || 'ALL';
+
     const upserts = [];
     const toDelete = [];
     daringChanges.forEach((status, id) => {
       const s = daringStudents.find(x => x.id === id);
-      if (!s || isDaringLocked(s)) return; // never touch locked rows
+      if (!s || isDaringLocked(s) || !isDaringGradeAllowed(s.kelas)) return; // never touch locked / not-allowed rows
       if (status === 'HADIR' || status === 'ALPHA') {
         upserts.push({ student_id: id, date: today, status, semester: currentSemester, operator: currentOperator, locked_by: null });
       } else {
