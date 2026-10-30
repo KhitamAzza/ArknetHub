@@ -1529,7 +1529,8 @@ let adminNoProof = false; // true in Mode Daring: no proof photos, so the photo 
 let adminInputStudents = [];
 let adminInputChanges = new Map();
 let adminInputGradeFilter = 'ALL';   // 'ALL' | 'X' | 'XI' — view filter (hides the other grade)
-let adminInputBulkStatus = 'HADIR';  // status applied by the "Tandai Semua" button
+let adminInputBulkStatus = 'HADIR';  // status applied by the "Tandai Semua" button ('__CUSTOM__' = free text)
+let adminInputBulkCustom = '';       // free-text status typed by the admin
 let adminInputUnlocked = new Set(); // ids unlocked this session (the DB lock stays until a save rewrites the row)
 
 function showAdminInput() {
@@ -1564,6 +1565,7 @@ async function initAdminInput() {
   adminInputUnlocked.clear();
   adminInputGradeFilter = 'ALL';
   adminInputBulkStatus = 'HADIR';
+  adminInputBulkCustom = '';
   const list = document.getElementById('adminInputList');
   if (list) list.innerHTML = '<div class="empty-state" style="padding-top:40px;"><div class="empty-state-icon">📋</div><div class="empty-state-text">Pilih ekskul untuk memulai input</div></div>';
   updateAdminInputStats();
@@ -2061,6 +2063,8 @@ function renderAdminInputFilter() {
   }
   const sel = document.getElementById('adminBulkStatus');
   if (sel) sel.value = adminInputBulkStatus;
+  const customInp = document.getElementById('adminBulkCustom');
+  if (customInp) customInp.value = adminInputBulkCustom;
   updateAdminBulkButton();
 }
 
@@ -2068,19 +2072,54 @@ function onAdminBulkStatusChange() {
   const sel = document.getElementById('adminBulkStatus');
   adminInputBulkStatus = sel ? sel.value : 'HADIR';
   updateAdminBulkButton();
+  if (adminInputBulkStatus === '__CUSTOM__') {
+    const inp = document.getElementById('adminBulkCustom');
+    if (inp) inp.focus();
+  }
+}
+
+function onAdminBulkCustomInput() {
+  const inp = document.getElementById('adminBulkCustom');
+  adminInputBulkCustom = inp ? inp.value : '';
+  updateAdminBulkButton();
+}
+
+// Free-text status: uppercase, trimmed, simple characters only, max 20 long.
+function sanitizeCustomStatus(text) {
+  return String(text || '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9 \-\/().,]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 20);
+}
+
+// Resolves the dropdown into the status that will be written ('' = clear).
+function getAdminBulkTarget() {
+  return adminInputBulkStatus === '__CUSTOM__'
+    ? sanitizeCustomStatus(adminInputBulkCustom)
+    : adminInputBulkStatus;
 }
 
 function updateAdminBulkButton() {
+  const isCustom = adminInputBulkStatus === '__CUSTOM__';
+  const inp = document.getElementById('adminBulkCustom');
+  if (inp) inp.style.display = isCustom ? 'block' : 'none';
+
   const btn = document.getElementById('adminBulkBtn');
   if (!btn) return;
-  btn.textContent = adminInputBulkStatus
-    ? `✓ Tandai Semua ${adminInputBulkStatus}`
-    : '✓ Kosongkan Semua';
+  const target = getAdminBulkTarget();
+  if (isCustom) btn.textContent = target ? `✓ Tandai Semua ${target}` : '✓ Tandai Semua (isi status)';
+  else btn.textContent = target ? `✓ Tandai Semua ${target}` : '✓ Kosongkan Semua';
 }
 
 // Applies the chosen status to the rows currently visible only.
 function markAllAdminInput() {
-  const target = adminInputBulkStatus; // '' = clear
+  const target = getAdminBulkTarget(); // '' = clear
+  if (adminInputBulkStatus === '__CUSTOM__' && !target) {
+    showStatus("Isi dulu status kustomnya", "error");
+    return;
+  }
   const visible = getVisibleAdminInputStudents();
   let marked = 0, skipped = 0;
 
