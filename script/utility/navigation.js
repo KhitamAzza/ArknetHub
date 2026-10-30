@@ -11,7 +11,7 @@
     'ketuaScreen', 'tatibScreen', 'tatibPaymentScreen', 'tatibHeatmapScreen',
     'tatibBermasalahScreen', 'kelolaSiswaScreen', 'paperScreen', 'adminInputScreen',
     'proofViewerScreen', 'kelolaAbsensiScreen', 'printAbsensiScreen', 'nilaiScreen',
-    'tambahPoinScreen'
+    'tambahPoinScreen','daringscreen'
   ];
 
   // Modals/overlays (toggled via 'visible' class, or display on overlay)

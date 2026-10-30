@@ -2604,3 +2604,15 @@ font-size: 12px;}
   transform: scale(0.9);
   background: rgba(245, 158, 11, 0.25);
 }
+/* Mode Daring: no proof photo, so hide the photo pane, the toggle button and the upload dots */
+#adminInputScreen.no-proof .admin-input-photo-pane,
+#adminInputScreen.no-proof .admin-input-view-toggle,
+#adminInputScreen.no-proof .admin-ekstra-chip-dot {
+  display: none !important;
+}
+#daringScreen {
+  display: none;
+  flex-direction: column;
+  height: 100dvh;
+  background: var(--bg);
+}

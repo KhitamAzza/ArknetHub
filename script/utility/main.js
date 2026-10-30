@@ -109,7 +109,7 @@ function hideAllScreens() {
     "expelModal", "paperScreen", "adminInputScreen", "proofViewerScreen",
     "kelolaAbsensiScreen", "printAbsensiScreen",
     "penarikanDendaScreen", "adminDendaPaymentScreen", "dendaDiterimaScreen",
-    "tambahPoinScreen"
+    "tambahPoinScreen", "daringScreen"
   ];
   ids.forEach(id => {
     const el = document.getElementById(id);
@@ -228,16 +228,6 @@ async function doLogin() {
   passwordInput.focus();
 }
 // ===== NAVIGATION =====
-function showDashboard() {
-  if (dashboardScreen) dashboardScreen.style.display = "flex";
-  mainApp.style.display = "none";
-  absenMenuScreen.style.display = "none";
-  registrationScreen.style.display = "none";
-  const admin = document.getElementById("adminScreen");
-  const helper = document.getElementById("helperScreen");
-  if (admin) admin.style.display = "none";
-  if (helper) helper.style.display = "none";
-}
 function showTatibScreen() {
   hideAllScreens();
   const el = document.getElementById("tatibScreen");
@@ -385,6 +375,7 @@ function showDashboard() {
   hideAllScreens();
   if (dashboardScreen) dashboardScreen.style.display = "flex";
   if (typeof applyNilaiMenuVisibility === 'function') applyNilaiMenuVisibility();
+  if (typeof applyAbsensiModeLabel === 'function') applyAbsensiModeLabel();
 }
 
 function showAdminScreen() {
@@ -587,7 +578,6 @@ document.addEventListener("keydown", (e) => {
   if (mainApp.style.display !== "none") {
     if (e.key === "ArrowRight") nextStudent();
     if (e.key === "ArrowLeft") prevStudent();
-    if (e.key === "Enter" || e.key === " ") markCurrentStudent();
   }
 });
 
@@ -647,6 +637,7 @@ async function loadSupabaseConfig() {
         nilaiMinusTerlambat: data.nilai_minus_terlambat,
         maxPointSubmit: data.max_point_submit,
         maxRedemptionPoint: data.max_redemption_point,
+        daringMode: data.daring_mode === true,
         nilaiEnable: data.nilai_enable !== false,
         currentSemester: currentSemester
     };
@@ -676,6 +667,7 @@ function getDefaultConfig() {
         maxPointSubmit: 1,
         maxRedemptionPoint: 5,
         nilaiEnable: true,
+        daringMode: false,
         currentSemester: 'STS (Ganjil)'
     };
 }

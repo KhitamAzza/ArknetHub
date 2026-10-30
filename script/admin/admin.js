@@ -388,7 +388,8 @@ const CONFIG_DB_MAP = {
   currentSemester: 'current_semester',
   omrRequireCorners: 'omr_require_corners',
   uploadBackend: 'upload_backend',
-  nilaiEnable: 'nilai_enable'
+  nilaiEnable: 'nilai_enable',
+  daringMode: 'daring_mode'
 };
 
 function initConfigMenu() {
@@ -428,7 +429,8 @@ async function loadConfigValues() {
   currentSemester: data.current_semester || 'STS (Ganjil)',
   uploadBackend: data.upload_backend || 'cloudinary',
   omrRequireCorners: data.omr_require_corners,
-  nilaiEnable: data.nilai_enable !== false
+  nilaiEnable: data.nilai_enable !== false,
+  daringMode: data.daring_mode === true
 };
 
     const { data: ketuaData, error: ketuaErr } = await sb
@@ -462,6 +464,7 @@ function renderConfigMenu() {
   {
     title: "Menu pembina",
     items: [
+      { key: "daringMode", label: "Mode Daring (pembina input langsung, tanpa foto)", type: "toggle" },
       { key: "nilaiEnable", label: "Aktifkan menu Nilai Ekskul", type: "toggle" },
       { type: "danger", label: "Reset semua nilai ekskul", desc: "Mengembalikan nilai seluruh siswa ke 0. Tidak bisa dibatalkan.", btn: "Reset", action: "openNilaiPurge()" }
     ]
@@ -1508,6 +1511,7 @@ async function loadAdminEkstraAttendanceStatus() {
   }
 }
 // ===== ADMIN MANUAL INPUT =====
+let adminNoProof = false; // true in Mode Daring: no proof photos, so the photo pane/status is skipped
 let adminInputStudents = [];
 let adminInputChanges = new Map();
 let adminInputUnlocked = new Set(); // ids unlocked this session (the DB lock stays until a save rewrites the row)
@@ -1522,6 +1526,9 @@ function showAdminInput() {
 }
 
 async function initAdminInput() {
+  adminNoProof = await fetchDaringMode();
+  const inputScr = document.getElementById('adminInputScreen');
+  if (inputScr) inputScr.classList.toggle('no-proof', adminNoProof);
   initAdminPhotoViewportEvents();
 
   const select = document.getElementById('adminInputEkstra');
@@ -1572,6 +1579,7 @@ function selectAdminEkstraChip(ekstra) {
 }
 
 async function loadAdminEkstraUploadStatus() {
+  if (adminNoProof) return;
   const today = todayJakartaDate();
   try {
     const { data, error } = await sb
@@ -2057,6 +2065,7 @@ let adminProofPhotos = [];   // all pages/lembar for the current ekstra+date+sem
 let adminProofPhotoIndex = 0;
 
 async function loadAdminProofPhoto(ekstra, date) {
+  if (adminNoProof) return;
   adminInputCurrentEkstra = ekstra;
   adminProofCurrentDate = date;
   updateAdminPhotoDateLabel();

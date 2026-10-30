@@ -44,9 +44,9 @@
     <div class="school-name">di portal Ekstrakurikuler<br>SMK Diponegoro Tumpang</div>
   </div>
   <div class="dashboard-grid">
-    <div class="dash-btn" onclick="showPaperScreen()">
+    <div class="dash-btn" onclick="openAbsensiPembina()">
   <div class="dash-icon"><svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-image-up preview-icon"><path d="M10.3 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10l-3.1-3.1a2 2 0 0 0-2.814.014L6 21"/><path d="m14 19.5 3-3 3 3"/><path d="M17 22v-5.5"/><circle cx="9" cy="9" r="2"/></svg></div>
-  <div class="dash-label">Upload Absensi</div>
+  <div class="dash-label" id="paperDashLabel">Upload Absensi</div>
 </div>
     <div class="dash-btn" id="regDashBtn" onclick="showRegistration()">
       <div class="dash-icon"><svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user-round-plus preview-icon"><path d="M2 21a8 8 0 0 1 13.292-6"/><circle cx="10" cy="8" r="5"/><path d="M19 16v6"/><path d="M22 19h-6"/></svg></div>
@@ -225,6 +225,25 @@
     <button class="btn-send-compact" id="adminInputSaveBtn" onclick="submitAdminInput()" disabled>Simpan</button>
   </div>
 </div>
+
+   <div id="daringScreen" style="display:none;">
+     <div class="app-header">
+       <button class="icon-btn" onclick="backToDashboard()">◀</button>
+       <div class="operator-info" style="flex:1;margin-left:12px;">
+         <div class="operator-name">Absensi Daring</div>
+         <div class="operator-ekstra" id="daringEkstraLabel">-</div>
+       </div>
+     </div>
+     <div style="flex:1;overflow-y:auto;padding:16px;">
+       <div id="daringWindowNote" style="font-size:13px;margin-bottom:12px;"></div>
+       <button class="btn-secondary" style="width:100%;margin-bottom:12px;" onclick="markAllDaringHadir()">✓ Tandai Semua Hadir</button>
+       <div id="daringList"></div>
+     </div>
+     <div class="bottom-bar">
+       <div id="daringChangeCount">0 perubahan</div>
+       <button class="btn-send-compact" id="daringSaveBtn" onclick="submitDaring()" disabled>Simpan</button>
+     </div>
+   </div>
 
 <!-- KELOLA ABSENSI SCREEN -->
 <div id="kelolaAbsensiScreen" style="display:none;">
@@ -1567,6 +1586,7 @@
 <script src="script/utility/utils.js"></script>
 <script src="script/pembina/registration.js"></script>
 <script src="script/pembina/paper.js"></script>
+<script src="script/pembina/daring.js"></script>
 <script src="script/pembina/daftar.js"></script>
 <script src="script/pembina/syarat.js"></script>
 <script src="script/pembina/nilai.js"></script>

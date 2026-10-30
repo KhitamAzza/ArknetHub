@@ -1,10 +1,11 @@
 // ArkNet Hub — Service Worker
 // Bump CACHE_VERSION on every deploy so old shells get replaced.
-const CACHE_VERSION = 'arknet-hub-v8';
+const CACHE_VERSION = 'arknet-hub-v10';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 
 // App shell: everything needed for the UI to boot and render offline.
-// Data (Supabase calls, face-api model files) is NOT pre-cached here —
+// Paths must match exactly what index.html loads (style/..., script/...).
+// Data (Supabase calls, CDN scripts) is NOT pre-cached here —
 // those go through the network-first runtime strategy below.
 const SHELL_ASSETS = [
   './',
@@ -12,39 +13,51 @@ const SHELL_ASSETS = [
   './manifest.json',
 
   // CSS
-  './style.css',
-  './helper.css',
-  './admin.css',
-  './ketua.css',
-  './tatib.css',
-  './overseer.css',
-  './denda.css',
+  './style/style.css',
+  './style/helper.css',
+  './style/admin.css',
+  './style/ketua.css',
+  './style/tatib.css',
+  './style/overseer.css',
+  './style/denda.css',
+  './style/nilai.css',
 
   // JS
-  './main.js',
-  './utils.js',
-  './registration.js',
-  './paper.js',
-  './daftar.js',
-  './syarat.js',
-  './dana.js',
-  './helper.js',
-  './admin.js',
-  './tatib.js',
-  './overseer.js',
-  './navigation.js',
-  './denda.js',
-  '.tambahpoin.js,
+  './script/utility/main.js',
+  './script/utility/utils.js',
+  './script/pembina/registration.js',
+  './script/pembina/paper.js',
+  './script/pembina/daring.js',
+  './script/pembina/daftar.js',
+  './script/pembina/syarat.js',
+  './script/pembina/nilai.js',
+  './script/pembina/dana.js',
+  './script/pembina/helper.js',
+  './script/admin/admin.js',
+  './script/admin/denda.js',
+  './script/admin/tambahpoin.js',
+  './script/admin/overseer.js',
+  './script/tatib/tatib.js',
+  './script/utility/navigation.js',
 
   // Icons
   './ArknetHub-192.png',
   './ArknetHub-512.png',
+  './icons/icon-192.png',
 ];
 
 // --- INSTALL: pre-cache the app shell ---
+// Each file is cached on its own, so one wrong path/404 can no longer
+// make the whole install fail (cache.addAll is all-or-nothing).
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(SHELL_CACHE).then((cache) => cache.addAll(SHELL_ASSETS))
+    caches.open(SHELL_CACHE).then((cache) =>
+      Promise.allSettled(
+        SHELL_ASSETS.map((asset) =>
+          cache.add(asset).catch((err) => console.warn('[SW] not cached:', asset, err))
+        )
+      )
+    )
   );
   self.skipWaiting();
 });
@@ -70,7 +83,7 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
 
-  // Cross-origin (Supabase API, face-api CDN, jsdelivr, etc.) — network first,
+  // Cross-origin (Supabase API, CDNs, etc.) — network first,
   // no cache fallback, so data always stays fresh when online.
   if (url.origin !== self.location.origin) {
     event.respondWith(
