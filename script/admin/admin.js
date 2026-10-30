@@ -1528,6 +1528,8 @@ async function loadAdminEkstraAttendanceStatus() {
 let adminNoProof = false; // true in Mode Daring: no proof photos, so the photo pane/status is skipped
 let adminInputStudents = [];
 let adminInputChanges = new Map();
+let adminInputGradeFilter = 'ALL';   // 'ALL' | 'X' | 'XI' — view filter (hides the other grade)
+let adminInputBulkStatus = 'HADIR';  // status applied by the "Tandai Semua" button
 let adminInputUnlocked = new Set(); // ids unlocked this session (the DB lock stays until a save rewrites the row)
 
 function showAdminInput() {
@@ -1560,6 +1562,8 @@ async function initAdminInput() {
   adminInputStudents = [];
   adminInputChanges.clear();
   adminInputUnlocked.clear();
+  adminInputGradeFilter = 'ALL';
+  adminInputBulkStatus = 'HADIR';
   const list = document.getElementById('adminInputList');
   if (list) list.innerHTML = '<div class="empty-state" style="padding-top:40px;"><div class="empty-state-icon">📋</div><div class="empty-state-text">Pilih ekskul untuk memulai input</div></div>';
   updateAdminInputStats();
@@ -1660,6 +1664,7 @@ async function loadAdminInputList() {
     }));
     adminInputChanges.clear();
     adminInputUnlocked.clear();
+    renderAdminInputFilter();
     renderAdminInputList();
     updateAdminInputStats();
   } catch (err) {
@@ -1959,9 +1964,7 @@ function renderAdminInputList() {
   const container = document.getElementById('adminInputList');
   if (!container) return;
 
-  const filtered = adminInputSearchQuery 
-    ? adminInputStudents.filter(s => s.nama.toLowerCase().includes(adminInputSearchQuery))
-    : adminInputStudents;
+  const filtered = getVisibleAdminInputStudents();
 
   if (filtered.length === 0) {
     container.innerHTML = '<div class="empty-state" style="padding-top:40px;"><div class="empty-state-icon">📭</div><div class="empty-state-text">Tidak ada siswa</div></div>';
@@ -2019,15 +2022,89 @@ function setAdminInputStatus(id, status) {
   updateAdminInputStats();
 }
 
-function markAllAdminInputHadir() {
-  let skipped = 0;
-  adminInputStudents.forEach(s => {
-    if (isAdminInputLocked(s)) { skipped++; return; } // helper/Fixer statuses stay untouched
-    if ((s.currentStatus || '') !== 'HADIR') adminInputChanges.set(s.id, 'HADIR');
+// "X DKV 1" -> 'X', "XI TKJ 2" -> 'XI', anything else -> 'LAIN'
+function getAdminGrade(kelas) {
+  const first = String(kelas || '').trim().toUpperCase().split(/\s+/)[0];
+  return (first === 'X' || first === 'XI') ? first : 'LAIN';
+}
+
+// Single source of truth for "what's on screen": grade filter + name search.
+// Both the list and the batch button use this, so hidden rows are never touched.
+function getVisibleAdminInputStudents() {
+  return adminInputStudents.filter(s => {
+    if (adminInputGradeFilter !== 'ALL' && getAdminGrade(s.kelas) !== adminInputGradeFilter) return false;
+    if (adminInputSearchQuery && !s.nama.toLowerCase().includes(adminInputSearchQuery)) return false;
+    return true;
   });
+}
+
+function setAdminInputGradeFilter(grade) {
+  adminInputGradeFilter = grade;
+  adminInputFocusedIndex = -1;
+  renderAdminInputFilter();
+  renderAdminInputList();
+}
+
+function renderAdminInputFilter() {
+  const row = document.getElementById('adminInputFilterRow');
+  if (row) {
+    const count = g => g === 'ALL'
+      ? adminInputStudents.length
+      : adminInputStudents.filter(s => getAdminGrade(s.kelas) === g).length;
+    const opts = [['ALL', 'Semua'], ['X', 'Kelas X'], ['XI', 'Kelas XI']];
+    row.innerHTML = opts.map(([g, label]) => `
+      <button type="button" class="admin-ekstra-chip${adminInputGradeFilter === g ? ' active' : ''}"
+              onclick="setAdminInputGradeFilter('${g}')">
+        <span class="admin-ekstra-chip-label">${label} (${count(g)})</span>
+      </button>
+    `).join('');
+  }
+  const sel = document.getElementById('adminBulkStatus');
+  if (sel) sel.value = adminInputBulkStatus;
+  updateAdminBulkButton();
+}
+
+function onAdminBulkStatusChange() {
+  const sel = document.getElementById('adminBulkStatus');
+  adminInputBulkStatus = sel ? sel.value : 'HADIR';
+  updateAdminBulkButton();
+}
+
+function updateAdminBulkButton() {
+  const btn = document.getElementById('adminBulkBtn');
+  if (!btn) return;
+  btn.textContent = adminInputBulkStatus
+    ? `✓ Tandai Semua ${adminInputBulkStatus}`
+    : '✓ Kosongkan Semua';
+}
+
+// Applies the chosen status to the rows currently visible only.
+function markAllAdminInput() {
+  const target = adminInputBulkStatus; // '' = clear
+  const visible = getVisibleAdminInputStudents();
+  let marked = 0, skipped = 0;
+
+  visible.forEach(s => {
+    if (isAdminInputLocked(s)) { skipped++; return; } // helper/Fixer statuses stay untouched
+    const original = s.currentStatus || '';
+    if (target === original) adminInputChanges.delete(s.id);
+    else adminInputChanges.set(s.id, target);
+    marked++;
+  });
+
   renderAdminInputList();
   updateAdminInputStats();
-  if (skipped > 0) showStatus(`${skipped} siswa dilewati (status terkunci)`, "info");
+
+  const scope = adminInputGradeFilter === 'ALL' ? '' : ` (Kelas ${adminInputGradeFilter})`;
+  let msg = `${marked} siswa → ${target || 'KOSONG'}${scope}`;
+  if (skipped > 0) msg += `, ${skipped} dilewati (terkunci)`;
+  showStatus(msg, "info");
+}
+
+// Kept so any old onclick="markAllAdminInputHadir()" still works.
+function markAllAdminInputHadir() {
+  adminInputBulkStatus = 'HADIR';
+  markAllAdminInput();
 }
 
 function updateAdminInputStats() {
