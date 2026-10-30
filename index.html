@@ -214,7 +214,19 @@
 
       <input type="text" id="adminInputSearch" class="form-input" placeholder="Cari nama siswa..." style="margin-bottom:12px;" oninput="onAdminInputSearch()">
       <div class="admin-ekstra-chip-row" id="daringFilterRow" style="margin-bottom:12px;"></div>
-      <button class="btn-secondary" style="width:100%;margin-bottom:12px;" onclick="markAllAdminInputHadir()">✓ Tandai Semua Hadir</button>
+      <div class="admin-ekstra-chip-row" id="adminInputFilterRow" style="margin-bottom:12px;"></div>
+<div style="display:flex;gap:8px;margin-bottom:12px;">
+  <select id="adminBulkStatus" class="form-input" style="flex:0 0 38%;" onchange="onAdminBulkStatusChange()">
+    <option value="HADIR">HADIR</option>
+    <option value="ALPHA">ALPHA</option>
+    <option value="TERLAMBAT">TERLAMBAT</option>
+    <option value="PAGI">PAGI</option>
+    <option value="IZIN">IZIN</option>
+    <option value="SAKIT">SAKIT</option>
+    <option value="">KOSONG</option>
+  </select>
+  <button class="btn-secondary" id="adminBulkBtn" style="flex:1;" onclick="markAllAdminInput()">✓ Tandai Semua Hadir</button>
+</div>
 
       <div id="adminInputList"></div>
     </div>
