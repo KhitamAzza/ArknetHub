@@ -224,8 +224,13 @@
     <option value="IZIN">IZIN</option>
     <option value="SAKIT">SAKIT</option>
     <option value="">KOSONG</option>
+    <option value="__CUSTOM__">LAINNYA…</option>
   </select>
+  
   <button class="btn-secondary" id="adminBulkBtn" style="flex:1;" onclick="markAllAdminInput()">✓ Tandai Semua Hadir</button>
+  <input type="text" id="adminBulkCustom" class="form-input" maxlength="20"
+       placeholder="Ketik status, mis. LOMBA" style="display:none;margin-bottom:12px;"
+       oninput="onAdminBulkCustomInput()">
 </div>
 
       <div id="adminInputList"></div>
