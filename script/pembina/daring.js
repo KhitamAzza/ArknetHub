@@ -9,6 +9,7 @@ let daringStudents = [];
 let daringChanges = new Map();   // student_id -> 'HADIR' | 'ALPHA' | ''
 let daringWindow = { start: 0, end: 24 };
 let daringGradeFilter = 'ALL';   // 'ALL' | 'X' | 'XI'  (pembina's own view filter)
+let daringSearchQuery = '';      // name search (pembina daring screen only)
 let daringKelasRule = 'ALL';     // 'ALL' | 'X' | 'XI'  (admin rule from Config.daring_kelas, absolute)
 
 function isDaringGradeAllowed(kelas) {
@@ -21,9 +22,20 @@ function getDaringGrade(kelas) {
   return (first === 'X' || first === 'XI') ? first : 'LAIN';
 }
 
+// What is on screen: grade filter + name search. The list and the
+// "Tandai Semua Hadir" button both use this, so hidden rows are never touched.
 function getVisibleDaringStudents() {
-  if (daringGradeFilter === 'ALL') return daringStudents;
-  return daringStudents.filter(s => getDaringGrade(s.kelas) === daringGradeFilter);
+  return daringStudents.filter(s => {
+    if (daringGradeFilter !== 'ALL' && getDaringGrade(s.kelas) !== daringGradeFilter) return false;
+    if (daringSearchQuery && !String(s.nama || '').toLowerCase().includes(daringSearchQuery)) return false;
+    return true;
+  });
+}
+
+function onDaringSearch() {
+  const inp = document.getElementById('daringSearch');
+  daringSearchQuery = inp ? inp.value.trim().toLowerCase() : '';
+  renderDaringList();
 }
 
 function setDaringFilter(grade) {
@@ -112,6 +124,9 @@ function showDaringScreen() {
 async function initDaring() {
   daringChanges.clear();
   daringGradeFilter = 'ALL';
+  daringSearchQuery = '';
+  const searchEl = document.getElementById('daringSearch');
+  if (searchEl) searchEl.value = '';
   const label = document.getElementById('daringEkstraLabel');
   if (label) label.textContent = currentEkstra || '-';
   renderDaringWindowNote();
