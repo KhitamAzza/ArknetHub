@@ -213,7 +213,6 @@
       </select>
 
       <input type="text" id="adminInputSearch" class="form-input" placeholder="Cari nama siswa..." style="margin-bottom:12px;" oninput="onAdminInputSearch()">
-      <div class="admin-ekstra-chip-row" id="daringFilterRow" style="margin-bottom:12px;"></div>
       <div class="admin-ekstra-chip-row" id="adminInputFilterRow" style="margin-bottom:12px;"></div>
 <div style="display:flex;gap:8px;margin-bottom:12px;">
   <select id="adminBulkStatus" class="form-input" style="flex:0 0 38%;" onchange="onAdminBulkStatusChange()">
@@ -226,12 +225,11 @@
     <option value="">KOSONG</option>
     <option value="__CUSTOM__">LAINNYA…</option>
   </select>
-  
   <button class="btn-secondary" id="adminBulkBtn" style="flex:1;" onclick="markAllAdminInput()">✓ Tandai Semua Hadir</button>
-  <input type="text" id="adminBulkCustom" class="form-input" maxlength="20"
+</div>
+<input type="text" id="adminBulkCustom" class="form-input" maxlength="20"
        placeholder="Ketik status, mis. LOMBA" style="display:none;margin-bottom:12px;"
        oninput="onAdminBulkCustomInput()">
-</div>
 
       <div id="adminInputList"></div>
     </div>
@@ -243,24 +241,26 @@
   </div>
 </div>
 
-   <div id="daringScreen" style="display:none;">
-     <div class="app-header">
-       <button class="icon-btn" onclick="backToDashboard()">◀</button>
-       <div class="operator-info" style="flex:1;margin-left:12px;">
-         <div class="operator-name">Absensi Daring</div>
-         <div class="operator-ekstra" id="daringEkstraLabel">-</div>
-       </div>
-     </div>
-     <div style="flex:1;overflow-y:auto;padding:16px;">
-       <div id="daringWindowNote" style="font-size:13px;margin-bottom:12px;"></div>
-       <button class="btn-secondary" style="width:100%;margin-bottom:12px;" onclick="markAllDaringHadir()">✓ Tandai Semua Hadir</button>
-       <div id="daringList"></div>
-     </div>
-     <div class="bottom-bar">
-       <div id="daringChangeCount">0 perubahan</div>
-       <button class="btn-send-compact" id="daringSaveBtn" onclick="submitDaring()" disabled>Simpan</button>
-     </div>
-   </div>
+  <div id="daringScreen" style="display:none;">
+  <div class="app-header">
+    <button class="icon-btn" onclick="backToDashboard()">◀</button>
+    <div class="operator-info" style="flex:1;margin-left:12px;">
+      <div class="operator-name">Absensi Daring</div>
+      <div class="operator-ekstra" id="daringEkstraLabel">-</div>
+    </div>
+  </div>
+  <div class="admin-input-scroll">
+    <div id="daringWindowNote" style="font-size:13px;margin-bottom:12px;"></div>
+    <input type="text" id="daringSearch" class="form-input" placeholder="Cari nama siswa..." style="margin-bottom:12px;" oninput="onDaringSearch()">
+    <div class="admin-ekstra-chip-row" id="daringFilterRow" style="margin-bottom:12px;"></div>
+    <button class="btn-secondary" style="width:100%;margin-bottom:12px;" onclick="markAllDaringHadir()">✓ Tandai Semua Hadir</button>
+    <div id="daringList"></div>
+  </div>
+  <div class="bottom-bar">
+    <div id="daringChangeCount">0 perubahan</div>
+    <button class="btn-send-compact" id="daringSaveBtn" onclick="submitDaring()" disabled>Simpan</button>
+  </div>
+</div>
 
 <!-- KELOLA ABSENSI SCREEN -->
 <div id="kelolaAbsensiScreen" style="display:none;">
