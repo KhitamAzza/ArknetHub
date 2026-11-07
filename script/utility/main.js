@@ -20,7 +20,8 @@ const OPERATORS = {
   "devkoord1": { name: "Hernanda", ekstra: "MASTER", isMaster: true },
   "tatib1": { name: "Syamsul Arif", ekstra: "TATIB", isTatib: true },      // ← ADD
   "tatib2": { name: "Masduki Zen", ekstra: "TATIB", isTatib: true },
-  "eksbk": { name: "Bu Shofi (BK)", ekstra: "TATIB", isTatib: true }, // ← ADD
+  "eksbkshofi": { name: "Bu Shofi (BK)", ekstra: "TATIB", isTatib: true },
+  "eksbkavi": { name: "Bu Avi farida (BK)", ekstra: "TATIB", isTatib: true }, // ← ADD
   "eksesport": { name: "Masduki Zen", ekstra: "E-Sport" },
   "eksfutsal": { name: "Rizky", ekstra: "Futsal" },
   "ekspakbola": { name: "Rico Yoga", ekstra: "Sepakbola" },
