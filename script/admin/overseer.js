@@ -448,6 +448,56 @@ function renderOverseerEkstra(list) {
 let waReportSelectedDate = null;
 let waReportData = [];
 let waReportPendingAlpha = []; // student_ids that need an ALPHA row written to AttendanceV2 on confirm
+let waReportRedeemedOut = [];  // students excluded from the report because all their minus points are already redeemed
+
+// ===== REDEMPTION CONTEXT (same day only) =====
+// A student counts as "sudah menebus" for the report if a row in Redemptions
+// was created on the SAME calendar day (Asia/Jakarta) as the report date.
+// No semester-wide balance — detailed history lives in its own feature.
+function jakartaYMD(isoStr) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(new Date(isoStr));
+  const get = t => parts.find(p => p.type === t).value;
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
+// Returns { ok, byStudent: { student_id: { total, gurus: [] } } }.
+// Never throws: if Redemptions can't be read the report still works
+// (ok = false -> nobody is moved to the "sudah menebus" section).
+async function loadRedemptionsForDate(date) {
+  const result = { ok: false, byStudent: {} };
+  try {
+    const d = parseIndonesianDate(date);
+    const pad = n => String(n).padStart(2, '0');
+    const toYMD = dt => `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+    const ymd = toYMD(d);
+    const nextYmd = toYMD(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1));
+
+    const rows = await fetchAllRows((from, to) =>
+      sb.from('Redemptions')
+        .select('student_id, poin, guru, created_at')
+        .gte('created_at', `${ymd}T00:00:00+07:00`)
+        .lt('created_at', `${nextYmd}T00:00:00+07:00`)
+        .order('id', { ascending: true })
+        .range(from, to)
+    );
+
+    rows.forEach(r => {
+      if (jakartaYMD(r.created_at) !== ymd) return; // safety net on the day match
+      const e = result.byStudent[r.student_id] || (result.byStudent[r.student_id] = { total: 0, gurus: [] });
+      e.total += Number(r.poin) || 0;
+      const g = (r.guru || '').trim();
+      if (g && !e.gurus.includes(g)) e.gurus.push(g);
+    });
+
+    result.ok = true;
+  } catch (err) {
+    console.error('Gagal memuat data penebusan:', err);
+    showStatus('Data penebusan gagal dimuat, laporan tanpa info penebusan', 'error');
+  }
+  return result;
+}
 
 async function openWaReportModal() {
   if (overseerDates.length === 0) await loadOverseerDates();
@@ -455,6 +505,7 @@ async function openWaReportModal() {
   waReportSelectedDate = null;
   waReportData = [];
   waReportPendingAlpha = [];
+  waReportRedeemedOut = [];
 
   document.getElementById('waReportDateStep').style.display = 'block';
   document.getElementById('waReportWarning').style.display = 'none';
@@ -549,12 +600,25 @@ async function selectWaReportDate(date) {
     // that, not just use it for the WhatsApp text.
     waReportPendingAlpha = processed.filter(s => s.needsAlphaWrite).map(s => s.id);
 
-    // 4. Keep only ALPHA, TERLAMBAT, PAGI
-    waReportData = processed.filter(s =>
+    // 4. Redemption check (same day only): ALPHA/TERLAMBAT students who have
+    //    a Redemptions row created on this date are moved out of the main
+    //    list into their own "sudah menebus" section. PAGI has no minus point.
+    const redemption = await loadRedemptionsForDate(date);
+    processed.forEach(s => {
+      const red = redemption.byStudent[s.id];
+      s.redeemedPoin = red ? red.total : 0;
+      s.redeemedGuru = red ? red.gurus.join(', ') : '';
+      s.redeemedToday = s.redeemedPoin > 0 && ['ALPHA', 'TERLAMBAT'].includes(s.reportStatus);
+    });
+
+    // 5. Keep only ALPHA, TERLAMBAT, PAGI
+    const reportable = processed.filter(s =>
       ['ALPHA', 'TERLAMBAT', 'PAGI'].includes(s.reportStatus)
     );
+    waReportData = reportable.filter(s => !s.redeemedToday);
+    waReportRedeemedOut = reportable.filter(s => s.redeemedToday);
 
-    // 5. Build preview HTML (grouped by kelas)
+    // 6. Build preview HTML (grouped by kelas)
     const byClass = {};
     waReportData.forEach(s => {
       if (!byClass[s.kelas]) byClass[s.kelas] = [];
@@ -576,12 +640,28 @@ async function selectWaReportDate(date) {
     });
 
     if (waReportData.length === 0) {
-      previewHtml = `<div style="text-align:center;padding:20px;color:var(--text-secondary);font-size:14px;">Tidak ada siswa dengan status ALPHA, TERLAMBAT, atau PAGI</div>`;
+      previewHtml = `<div style="text-align:center;padding:20px;color:var(--text-secondary);font-size:14px;">${waReportRedeemedOut.length > 0 ? 'Tidak ada siswa lain dengan status ALPHA, TERLAMBAT, atau PAGI' : 'Tidak ada siswa dengan status ALPHA, TERLAMBAT, atau PAGI'}</div>`;
+    }
+
+    // "Sudah menebus" context section, shown ABOVE the main list
+    if (waReportRedeemedOut.length > 0) {
+      let redeemedHtml = `<div style="font-weight:700;margin:4px 0 6px;color:var(--green);font-size:14px;">✅ Sudah melakukan penebusan (${waReportRedeemedOut.length})</div>`;
+      waReportRedeemedOut.forEach(s => {
+        redeemedHtml += `
+          <div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;">
+            <div>${escapeHtml(s.nama)}</div>
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">
+              ${escapeHtml(s.kelas || '-')} • ${escapeHtml(cleanEkstra(s.ekstra))} • ${s.reportStatus} • ${s.redeemedPoin} poin • diinput oleh ${escapeHtml(s.redeemedGuru || '-')}
+            </div>
+          </div>`;
+      });
+      redeemedHtml += `<div style="height:8px;"></div>`;
+      previewHtml = redeemedHtml + previewHtml;
     }
 
     document.getElementById('waReportPreviewContent').innerHTML = previewHtml;
 
-    // 6. Show warning if there are empty/TELAT records
+    // 7. Show warning if there are empty/TELAT records
     if (emptyCount > 0 || telatCount > 0) {
       document.getElementById('waReportDateStep').style.display = 'none';
       document.getElementById('waReportWarning').style.display = 'block';
@@ -636,10 +716,23 @@ function showWaReportPreview() {
   document.getElementById('waReportFooter').style.display = 'flex';
 }
 
+function cleanEkstra(ekstra) {
+  return (ekstra && ekstra.trim() !== '0') ? ekstra.trim() : '-';
+}
+
 function sendWaReport() {
   if (!waReportSelectedDate || !waReportData) return;
 
   let text = `*LAPORAN KEHADIRAN*\n📅 ${waReportSelectedDate}\n\n`;
+
+  // Context first: students who already redeemed on this date
+  if (waReportRedeemedOut.length > 0) {
+    text += `*SUDAH MELAKUKAN PENEBUSAN*\n`;
+    waReportRedeemedOut.forEach(s => {
+      text += `- ${s.nama} - ${s.kelas || '-'} - ${cleanEkstra(s.ekstra)} - ${s.reportStatus} - ${s.redeemedPoin} poin (diinput oleh ${s.redeemedGuru || '-'})\n`;
+    });
+    text += '\n';
+  }
 
   const byClass = {};
   waReportData.forEach(s => {
@@ -657,7 +750,9 @@ function sendWaReport() {
   });
 
   if (waReportData.length === 0) {
-    text += 'Tidak ada siswa dengan status ALPHA, TERLAMBAT, atau PAGI.\n';
+    text += waReportRedeemedOut.length > 0
+      ? 'Tidak ada siswa lain dengan status ALPHA, TERLAMBAT, atau PAGI.\n'
+      : 'Tidak ada siswa dengan status ALPHA, TERLAMBAT, atau PAGI.\n';
   }
 
   const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
