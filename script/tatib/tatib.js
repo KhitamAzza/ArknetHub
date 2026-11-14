@@ -105,6 +105,7 @@ async function fetchTatibDebtData() {
   const config = await loadSupabaseConfig();
   const dendaAlpha = config.dendaAlpha || 0;
   const dendaTerlambat = config.dendaTerlambat || 0;
+  const dendaPagi = config.dendaPagi || 0;
 
   const { data: students, error: sErr } = await tatibFetchAll(() => sb
     .from('Database')
@@ -116,7 +117,7 @@ async function fetchTatibDebtData() {
     .from('AttendanceV2')  // was Attendance
     .select('student_id, status')
     .eq('semester', currentSemester)
-    .in('status', ['ALPHA', 'TERLAMBAT', 'TELAT'])
+    .in('status', ['ALPHA', 'TERLAMBAT', 'TELAT','PAGI'])
     .order('id', { ascending: true }));
   if (vErr) throw new Error("Gagal memuat pelanggaran: " + vErr.message);
 
@@ -130,11 +131,13 @@ async function fetchTatibDebtData() {
   const violationCounts = {};
   (violations || []).forEach(v => {
     if (!violationCounts[v.student_id]) {
-      violationCounts[v.student_id] = { alpha: 0, terlambat: 0 };
+      violationCounts[v.student_id] = { alpha: 0, terlambat: 0, pagi: 0 };
     }
     const st = (v.status || '').trim().toUpperCase();
     if (st === 'ALPHA') {
       violationCounts[v.student_id].alpha++;
+    } else if (st === 'PAGI') {
+      violationCounts[v.student_id].pagi++;
     } else {
       violationCounts[v.student_id].terlambat++;
     }
@@ -147,8 +150,8 @@ async function fetchTatibDebtData() {
 
   const debtors = [];
   (students || []).forEach(s => {
-    const v = violationCounts[s.id] || { alpha: 0, terlambat: 0 };
-    const total = (v.alpha * dendaAlpha) + (v.terlambat * dendaTerlambat);
+    const v = violationCounts[s.id] || { alpha: 0, terlambat: 0, pagi: 0 };
+    const total = (v.alpha * dendaAlpha) + (v.terlambat * dendaTerlambat) + (v.pagi * dendaPagi);
     const paid = paymentSums[s.id] || 0;
     const sisa = total - paid;
 
@@ -163,7 +166,9 @@ async function fetchTatibDebtData() {
         paid: paid,
         sisa: sisa,
         alphaCount: v.alpha,
-        terlambatCount: v.terlambat
+        terlambatCount: v.terlambat,
+        pagiCount: v.pagi
+        
       });
     }
   });
@@ -581,6 +586,7 @@ function tatibBmViolationLabel(s) {
   const parts = [];
   if (s.alphaCount > 0) parts.push(`Alpha ${s.alphaCount}x`);
   if (s.terlambatCount > 0) parts.push(`Terlambat ${s.terlambatCount}x`);
+  if (s.pagiCount > 0) parts.push(`Pagi ${s.pagiCount}x`);
   return parts.join(', ') || '-';
 }
 
@@ -736,6 +742,7 @@ async function fetchTatibMinusData() {
 
   const nilaiMinusAlpha = config.nilaiMinusAlpha || 0;
   const nilaiMinusTerlambat = config.nilaiMinusTerlambat || 0;
+  const nilaiMinusPagi = config.nilaiMinusPagi || 0;
   const threshold = config.minusPointThreshold ?? -30;
 
   // Paginated + ordered: a plain select is capped at 1000 rows, so students
@@ -751,7 +758,7 @@ async function fetchTatibMinusData() {
     .from('AttendanceV2')
     .select('student_id, status')
     .eq('semester', currentSemester)
-    .in('status', ['ALPHA', 'TERLAMBAT', 'TELAT'])
+    .in('status', ['ALPHA', 'TERLAMBAT', 'TELAT','PAGI'])
     .order('id', { ascending: true }));
   if (vErr) throw new Error("Gagal memuat pelanggaran: " + vErr.message);
 
@@ -769,9 +776,10 @@ async function fetchTatibMinusData() {
 
   const violationCounts = {};
   (violations || []).forEach(v => {
-    if (!violationCounts[v.student_id]) violationCounts[v.student_id] = { alpha: 0, terlambat: 0 };
+    if (!violationCounts[v.student_id]) violationCounts[v.student_id] = { alpha: 0, terlambat: 0, pagi: 0 };
     const st = (v.status || '').trim().toUpperCase();
     if (st === 'ALPHA') violationCounts[v.student_id].alpha++;
+    else if (st === 'PAGI') violationCounts[v.student_id].pagi++;
     else violationCounts[v.student_id].terlambat++;
   });
 
@@ -782,9 +790,8 @@ async function fetchTatibMinusData() {
 
   const byClass = {};
   (students || []).forEach(s => {
-    const v = violationCounts[s.id] || { alpha: 0, terlambat: 0 };
-    const nilai = (v.alpha * nilaiMinusAlpha) + (v.terlambat * nilaiMinusTerlambat) + (redemptionSums[s.id] || 0);
-
+    const v = violationCounts[s.id] || { alpha: 0, terlambat: 0, pagi: 0 };
+    const nilai = (v.alpha * nilaiMinusAlpha) + (v.terlambat * nilaiMinusTerlambat) + (v.pagi * nilaiMinusPagi) + (redemptionSums[s.id] || 0);
     // nilai < 0 is a hard guard on top of the threshold check — a student
     // sitting at exactly 0 (no real deficit) should never show up here,
     // even if Config.minus_point_threshold were ever set to 0 or above.

@@ -137,24 +137,26 @@ async function calcStudentDenda(studentId) {
   const config = await loadSupabaseConfig();
   const dendaAlpha = config.dendaAlpha || 0;
   const dendaTerlambat = config.dendaTerlambat || 0;
+  const dendaPagi = config.dendaPagi || 0;
 
   const { data: violations, error: vErr } = await sb
     .from('AttendanceV2')
     .select('status')
     .eq('student_id', studentId)
     .eq('semester', currentSemester)
-    .in('status', ['ALPHA', 'TERLAMBAT', 'TELAT']);
+    .in('status', ['ALPHA', 'TERLAMBAT', 'TELAT','PAGI']);
   if (vErr) throw vErr;
 
-  let alphaCount = 0, terlambatCount = 0;
+  let alphaCount = 0, terlambatCount = 0, pagiCount=0;
   (violations || []).forEach(v => {
     const st = (v.status || '').trim().toUpperCase();
     if (st === 'ALPHA') alphaCount++;
+    else if (st === 'PAGI') pagiCount++;
     else terlambatCount++;
   });
 
-  const total = (alphaCount * dendaAlpha) + (terlambatCount * dendaTerlambat);
-  return { total, alphaCount, terlambatCount };
+  const total = (alphaCount * dendaAlpha) + (terlambatCount * dendaTerlambat) + (pagiCount * dendaPagi);
+  return { total, alphaCount, terlambatCount, pagiCount };
 }
 
 async function openAdminDendaPaymentModal(studentId) {

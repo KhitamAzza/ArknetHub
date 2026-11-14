@@ -378,6 +378,8 @@ const CONFIG_DB_MAP = {
   dendaTerlambat: 'denda_terlambat',
   nilaiMinusAlpha: 'nilai_minus_alpha',
   nilaiMinusTerlambat: 'nilai_minus_terlambat',
+  dendaPagi: 'denda_pagi',
+  nilaiMinusPagi: 'nilai_minus_pagi',
   minusPointEnable: 'minus_point_enable',
   minusPointThreshold: 'minus_point_threshold',
   redemptionEnable: 'redemption_enable',
@@ -391,6 +393,7 @@ const CONFIG_DB_MAP = {
   nilaiEnable: 'nilai_enable',
   daringMode: 'daring_mode',
   daringKelas: 'daring_kelas'
+  
 };
 
 function initConfigMenu() {
@@ -420,6 +423,8 @@ async function loadConfigValues() {
   dendaTerlambat: data.denda_terlambat,
   nilaiMinusAlpha: data.nilai_minus_alpha,
   nilaiMinusTerlambat: data.nilai_minus_terlambat,
+  dendaPagi: data.denda_pagi || 0,
+  nilaiMinusPagi: data.nilai_minus_pagi || 0,
   minusPointEnable: data.minus_point_enable,
   minusPointThreshold: data.minus_point_threshold,
   redemptionEnable: data.redemption_enable,
@@ -484,10 +489,12 @@ function renderConfigMenu() {
   {
     title: "Konfigurasi sistem",
     items: [
-      { key: "dendaAlpha", label: "Denda alpha", type: "money" },
-      { key: "dendaTerlambat", label: "Denda terlambat/pagi", type: "money" },
-      { key: "nilaiMinusAlpha", label: "Nilai minus (Alpha)", type: "negative" },
-      { key: "nilaiMinusTerlambat", label: "Nilai minus (Terlambat/Pagi)", type: "negative" }
+{ key: "dendaAlpha", label: "Denda alpha", type: "money" },
+{ key: "dendaTerlambat", label: "Denda terlambat", type: "money" },
+{ key: "dendaPagi", label: "Denda pagi", type: "money" },
+{ key: "nilaiMinusAlpha", label: "Nilai minus (Alpha)", type: "negative" },
+{ key: "nilaiMinusTerlambat", label: "Nilai minus (Terlambat)", type: "negative" },
+{ key: "nilaiMinusPagi", label: "Nilai minus (Pagi)", type: "negative" }
     ]
   },
     {

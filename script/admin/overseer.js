@@ -608,7 +608,7 @@ async function selectWaReportDate(date) {
       const red = redemption.byStudent[s.id];
       s.redeemedPoin = red ? red.total : 0;
       s.redeemedGuru = red ? red.gurus.join(', ') : '';
-      s.redeemedToday = s.redeemedPoin > 0 && ['ALPHA', 'TERLAMBAT'].includes(s.reportStatus);
+      s.redeemedToday = s.redeemedPoin > 0 && ['ALPHA', 'TERLAMBAT', 'PAGI'].includes(s.reportStatus);
     });
 
     // 5. Keep only ALPHA, TERLAMBAT, PAGI
