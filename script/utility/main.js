@@ -110,7 +110,7 @@ function hideAllScreens() {
     "expelModal", "paperScreen", "adminInputScreen", "proofViewerScreen",
     "kelolaAbsensiScreen", "printAbsensiScreen",
     "penarikanDendaScreen", "adminDendaPaymentScreen", "dendaDiterimaScreen",
-    "tambahPoinScreen", "daringScreen"
+    "tambahPoinScreen", "daringScreen", "minusPoinScreen"
   ];
   ids.forEach(id => {
     const el = document.getElementById(id);
@@ -122,6 +122,11 @@ function hideAllScreens() {
 
   const tambahPoinModal = document.getElementById("tambahPoinModal");
   if (tambahPoinModal) tambahPoinModal.classList.remove("visible");
+
+  ["minusPoinModal", "poinChoiceModal"].forEach(id => {
+    const m = document.getElementById(id);
+    if (m) m.classList.remove("visible");
+  });
 
   if (summaryModal) summaryModal.classList.remove("visible");
   closeSearch();

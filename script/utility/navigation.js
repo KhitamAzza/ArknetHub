@@ -11,7 +11,7 @@
     'ketuaScreen', 'tatibScreen', 'tatibPaymentScreen', 'tatibHeatmapScreen',
     'tatibBermasalahScreen', 'kelolaSiswaScreen', 'paperScreen', 'adminInputScreen',
     'proofViewerScreen', 'kelolaAbsensiScreen', 'printAbsensiScreen', 'nilaiScreen',
-    'tambahPoinScreen','daringscreen'
+    'tambahPoinScreen','daringscreen', 'minusPoinScreen'
   ];
 
   // Modals/overlays (toggled via 'visible' class, or display on overlay)
@@ -20,7 +20,7 @@
     'waReportModal', 'overseerDateModal', 'waPreviewModal', 'removeModal',
     'tanpaEkstraModal', 'expelModal', 'backBlockModal', 'adminInputPickerModal',
     'adminProofDateModal', 'lateConfirmModal', 'searchOverlay', 'nilaiPurgeModal',
-    'tambahPoinModal'
+    'tambahPoinModal', 'minusPoinModal', 'poinChoiceModal'
   ];
 
   // "Home" level per role — back here asks for confirmation instead of

@@ -164,12 +164,14 @@ document.addEventListener("click", (e) => {
 // HITUNG POIN SISWA (sama dengan redemption.js, config dari appConfig utama)
 // ============================================
 async function tpComputeStudentPoint(studentId) {
-  const [{ data: attRows, error: attErr }, { data: reds, error: redErr }] = await Promise.all([
+  const [{ data: attRows, error: attErr }, { data: reds, error: redErr }, { data: manual, error: manErr }] = await Promise.all([
     sb.from("AttendanceV2").select("date, status").eq("student_id", studentId).eq("semester", currentSemester),
-    sb.from("Redemptions").select("poin").eq("student_id", studentId).eq("semester", currentSemester)
+    sb.from("Redemptions").select("poin").eq("student_id", studentId).eq("semester", currentSemester),
+    sb.from("PoinManual").select("poin").eq("student_id", studentId).eq("semester", currentSemester).eq("dibatalkan", false)
   ]);
   if (attErr) throw attErr;
   if (redErr) throw redErr;
+  if (manErr) throw manErr;
 
   const byDate = {};
   (attRows || []).forEach(r => {
@@ -184,14 +186,17 @@ async function tpComputeStudentPoint(studentId) {
 
   const minusAlpha = tpMinusValue(tpConfig?.nilaiMinusAlpha, -10);
   const minusLate  = tpMinusValue(tpConfig?.nilaiMinusTerlambat, -5);
-  const alphaCount = stats.ALPHA;
-  const lateCount  = stats.TERLAMBAT + stats.TELAT + stats.PAGI; // PAGI dihitung telat, sama seperti dashboard siswa
-  const totalMinus = (alphaCount * minusAlpha) + (lateCount * minusLate);
+  const minusPagi  = tpMinusValue(tpConfig?.nilaiMinusPagi, 0);
+  const lateCount  = stats.TERLAMBAT + stats.TELAT;
+  const totalMinus = (stats.ALPHA * minusAlpha) + (lateCount * minusLate) + (stats.PAGI * minusPagi);
+  const manualTotal = (manual || []).reduce((sum, r) => sum + (r.poin || 0), 0);
   const redemptionTotal = (reds || []).reduce((sum, r) => sum + (r.poin || 0), 0);
 
-  return { point: totalMinus + redemptionTotal, hadir: stats.HADIR, alpha: alphaCount, late: lateCount };
+  return {
+    point: totalMinus + manualTotal + redemptionTotal,
+    hadir: stats.HADIR, alpha: stats.ALPHA, late: lateCount, pagi: stats.PAGI
+  };
 }
-
 // ============================================
 // PILIH SISWA + DETAIL
 // ============================================

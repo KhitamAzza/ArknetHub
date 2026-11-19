@@ -547,10 +547,10 @@
   <div class="dash-label">Penarikan Denda Siswa</div>
   <div class="dash-desc">Setoran & konfirmasi tatib</div>
 </div>
-    <div class="dash-btn" onclick="showTambahPoin()">
+    <div class="dash-btn" onclick="openPoinChoice()">
   <div class="dash-icon"><svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></svg></div>
-  <div class="dash-label">Tambah Poin</div>
-  <div class="dash-desc">Kurangi minus siswa</div>
+  <div class="dash-label">Poin Siswa</div>
+  <div class="dash-desc">Tambah / kurangi poin</div>
 </div>
         <div class="dash-btn logout" onclick="doLogout()">
       <div class="dash-icon"><svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-logout-2"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M10 8v-2a2 2 0 0 1 2 -2h7a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-7a2 2 0 0 1 -2 -2v-2" /><path d="M15 12h-12l3 -3" /><path d="M6 15l-3 -3" /></svg></div>
@@ -1231,9 +1231,9 @@
       <div class="dash-label">Bukti Digital Absensi</div>
     </div>
     <!-- END NEW -->
-    <div class="dash-btn" onclick="showTambahPoin()">
+    <div class="dash-btn" onclick="openPoinChoice()">
       <div class="dash-icon"><svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></svg></div>
-      <div class="dash-label">Tambah Poin</div>
+      <div class="dash-label">Poin Siswa</div>
     </div>
     <div class="dash-btn logout" onclick="doLogout()">
       <div class="dash-icon"><svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-logout-2"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M10 8v-2a2 2 0 0 1 2 -2h7a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-7a2 2 0 0 1 -2 -2v-2" /><path d="M15 12h-12l3 -3" /><path d="M6 15l-3 -3" /></svg></div>
@@ -1536,6 +1536,81 @@
   </div>
 </div>
 
+<!-- MINUS POIN MANUAL -->
+<div id="minusPoinScreen" style="display:none;flex-direction:column;width:100%;height:100dvh;">
+  <div class="app-header">
+    <button class="icon-btn" onclick="closeMinusPoin()">◀</button>
+    <div class="operator-info" style="flex:1;margin-left:12px;">
+      <div class="operator-name">Minus Poin</div>
+      <div class="operator-ekstra" id="mpHeaderSub">Beri minus poin manual</div>
+    </div>
+  </div>
+
+  <div class="tp-body" style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:48px;">
+    <div class="tp-hero">
+      <div class="tp-hero-icon">➖</div>
+      <div class="tp-hero-title">Minus Poin Manual</div>
+      <div class="tp-hero-sub">Untuk pelanggaran di luar status absensi</div>
+    </div>
+
+    <div class="tp-search-wrap mp-search-wrap">
+      <input type="text" id="mpSearchInput" class="tp-search" placeholder="Cari nama siswa..." oninput="onMinusPoinSearch()" autocomplete="off">
+      <div id="mpSuggestions" class="tp-suggestions"></div>
+    </div>
+
+    <div class="tp-empty" id="mpEmpty">
+      <div class="tp-empty-icon">🔎</div>
+      <div class="tp-empty-text">Ketik minimal 2 huruf nama siswa</div>
+    </div>
+
+    <div id="mpDetail" style="display:none;"></div>
+  </div>
+</div>
+
+<!-- MINUS POIN MODAL -->
+<div id="minusPoinModal" class="modal-overlay">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title">Beri Minus Poin</div>
+      <button class="icon-btn" onclick="closeMinusPoinModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="tatib-detail-header">
+        <div class="tatib-detail-name" id="mpModalName">-</div>
+        <div class="tatib-detail-class" id="mpModalClass">-</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Jumlah poin dikurangi (1-50)</label>
+        <input type="number" id="mpAmount" class="form-input" min="1" max="50" step="1" inputmode="numeric" placeholder="contoh: 5">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Alasan (wajib)</label>
+        <textarea id="mpDesc" class="form-input" placeholder="Pelanggaran yang dilakukan..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeMinusPoinModal()">Batal</button>
+      <button class="btn-primary" id="mpSubmitBtn" onclick="submitMinusPoin()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- POIN CHOICE MODAL (Tambah / Kurangi) -->
+<div id="poinChoiceModal" class="modal-overlay">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title">Poin Siswa</div>
+      <button class="icon-btn" onclick="closePoinChoice()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <button class="btn-primary" style="width:100%;" onclick="pickPoinChoice('tambah')">➕ Tambah Poin<br><span style="font-size:12px;font-weight:400;opacity:.85;">Kurangi minus siswa (penebusan)</span></button>
+        <button class="btn-primary" style="width:100%;background:#ef4444;" onclick="pickPoinChoice('kurangi')">➖ Kurangi Poin<br><span style="font-size:12px;font-weight:400;opacity:.85;">Beri minus poin manual</span></button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ADMIN INPUT STATUS PICKER -->
 <div id="adminInputPickerModal" class="modal-overlay">
   <div class="modal-sheet">
@@ -1613,6 +1688,7 @@
 <script src="script/admin/denda.js"></script>
 <script src="script/admin/tambahpoin.js"></script>
 <script src="script/admin/overseer.js"></script>
+<script src="script/admin/MinusPoin.js"></script>
 <script src="script/tatib/tatib.js"></script>
 <script src="script/utility/navigation.js"></script>
 

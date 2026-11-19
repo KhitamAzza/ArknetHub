@@ -416,7 +416,7 @@ async function submitTatibPayment() {
    Plus a bottom "Kirim Semua Laporan" button on level 1 that
    compiles every class into one forwardable report.
    =================================================== */
-let tatibBmClassData = [];      // [{ kelas, totalDebt, students: [{nama, alphaCount, terlambatCount, sisa}] }]
+let tatibBmClassData = [];      // [{ kelas, totalDebt, students: [{nama, alphaCount, terlambatCount, pagiCount, sisa}] }]
 let tatibBmView = 'classes';    // 'classes' | 'detail'
 let tatibBmSelectedKelas = null;
 let tatibBmWakelMap = {};       // kelas -> { kelas, nama, whatsapp }
@@ -468,7 +468,7 @@ async function initTatibBermasalah() {
 
 async function fetchTatibBermasalahData() {
   // Same debt formula as the payment screens (violations x Config's
-  // denda_alpha/denda_terlambat, minus what's already been paid) — sisa > 0
+  // denda_alpha/denda_terlambat/denda_pagi, minus what's already been paid) — sisa > 0
   // only, so fully-paid students are excluded automatically.
   await fetchTatibDebtData(); // populates tatibDebtors
 
@@ -486,6 +486,7 @@ async function fetchTatibBermasalahData() {
       nama: s.nama,
       alphaCount: s.alphaCount,
       terlambatCount: s.terlambatCount,
+      pagiCount: s.pagiCount,
       sisa: s.sisa
     });
   });
@@ -651,10 +652,13 @@ function sendTatibBmAllReport() {
    nilai (poin) per student =
      (alphaCount x Config.nilai_minus_alpha)
      + (terlambatCount x Config.nilai_minus_terlambat)
+     + (pagiCount x Config.nilai_minus_pagi)
+     + sum(PoinManual.poin, not cancelled, this semester)  -- manual penalties, stored negative
      + sum(Redemptions.poin for that student this semester)
 
-   nilai_minus_alpha/terlambat are configured as negative
+   nilai_minus_alpha/terlambat/pagi are configured as negative
    values by default, so violations push nilai down;
+   PoinManual.poin is already negative and pushes it down too;
    Redemptions.poin (always positive per its DB check) adds
    back on top to represent recovered points.
 
@@ -669,7 +673,7 @@ function sendTatibBmAllReport() {
                         "Ingatkan Wakel"
    Plus bottom "Kirim Semua Laporan" on level 1.
    =================================================== */
-let tatibMinusClassData = [];      // [{ kelas, totalMinus, students: [{nama, alphaCount, terlambatCount, nilai}] }]
+let tatibMinusClassData = [];      // [{ kelas, totalMinus, students: [{nama, alphaCount, terlambatCount, pagiCount, manualPoin, nilai}] }]
 let tatibMinusView = 'classes';    // 'classes' | 'detail'
 let tatibMinusSelectedKelas = null;
 let tatibMinusWakelMap = {};
@@ -769,6 +773,15 @@ async function fetchTatibMinusData() {
     .order('id', { ascending: true }));
   if (rErr) throw new Error("Gagal memuat redemptions: " + rErr.message);
 
+  // Manual penalties (admin/tatib), stored negative; cancelled rows excluded.
+  const { data: manualRows, error: mErr } = await tatibFetchAll(() => sb
+    .from('PoinManual')
+    .select('student_id, poin')
+    .eq('semester', currentSemester)
+    .eq('dibatalkan', false)
+    .order('id', { ascending: true }));
+  if (mErr) throw new Error("Gagal memuat poin manual: " + mErr.message);
+
   const { data: wakelRows, error: wErr } = await sb.from('Wakel').select('kelas, nama, whatsapp');
   if (wErr) console.warn("Wakel load:", wErr.message);
   tatibMinusWakelMap = {};
@@ -788,10 +801,17 @@ async function fetchTatibMinusData() {
     redemptionSums[r.student_id] = (redemptionSums[r.student_id] || 0) + (r.poin || 0);
   });
 
+  const manualSums = {};
+  (manualRows || []).forEach(r => {
+    manualSums[r.student_id] = (manualSums[r.student_id] || 0) + (r.poin || 0);
+  });
+
   const byClass = {};
   (students || []).forEach(s => {
     const v = violationCounts[s.id] || { alpha: 0, terlambat: 0, pagi: 0 };
-    const nilai = (v.alpha * nilaiMinusAlpha) + (v.terlambat * nilaiMinusTerlambat) + (v.pagi * nilaiMinusPagi) + (redemptionSums[s.id] || 0);
+    const manualPoin = manualSums[s.id] || 0;
+    const nilai = (v.alpha * nilaiMinusAlpha) + (v.terlambat * nilaiMinusTerlambat) + (v.pagi * nilaiMinusPagi)
+                + manualPoin + (redemptionSums[s.id] || 0);
     // nilai < 0 is a hard guard on top of the threshold check — a student
     // sitting at exactly 0 (no real deficit) should never show up here,
     // even if Config.minus_point_threshold were ever set to 0 or above.
@@ -803,6 +823,8 @@ async function fetchTatibMinusData() {
         nama: s.nama,
         alphaCount: v.alpha,
         terlambatCount: v.terlambat,
+        pagiCount: v.pagi,
+        manualPoin,
         nilai
       });
     }
